@@ -1,7 +1,7 @@
 import React from 'react';
 import { Space, Typography, Select, InputNumber, Button } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
-import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '../common';
+import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
 
 const { Text } = Typography;
 

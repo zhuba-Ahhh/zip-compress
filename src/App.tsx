@@ -1,12 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Layout, Typography, Card, message, Divider } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
-import { compressData, decompressData, CompressionAlgorithm, generateRandomText } from './utils';
-import { Stats } from './types';
+import { generateRandomText } from './utils';
 import InputPanel from './components/InputPanel';
 import ControlPanel from './components/ControlPanel';
-import ResultBoard from './components/ResultBoard';
-import { STORAGE_KEYS, DEFAULT_VALUES } from './common';
+import ResultBoard, { TestPayload } from './components/ResultBoard';
+import { STORAGE_KEYS, DEFAULT_VALUES, CompressionAlgorithm } from '@/common';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -16,7 +15,9 @@ const App: React.FC = () => {
   const [textInput, setTextInput] = useState<string>('');
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [statsList, setStatsList] = useState<Stats[]>([]);
+
+  // 用于触发测试并传递给 ResultBoard
+  const [testPayload, setTestPayload] = useState<TestPayload | null>(null);
   
   // Initialize state from local storage if available
   const [algorithms, setAlgorithms] = useState<CompressionAlgorithm[]>(() => {
@@ -91,118 +92,22 @@ const App: React.FC = () => {
       return;
     }
     
+    // 给 loading 稍微一点反应时间，防止被单线程同步逻辑卡住
     setLoading(true);
-    
-    const initialStats: Stats[] = algorithms.map(algo => ({
-      algorithm: algo,
-      originalSize: data.length,
-      compressedSize: 0,
-      compressTime: 0,
-      decompressTime: 0,
-      avgCompressTime: 0,
-      avgDecompressTime: 0,
-      decompressedSize: 0,
-      ratio: '',
-      isMatch: false,
-      executionCount,
-      loading: true,
-    }));
-    setStatsList(initialStats);
-
-    // Allow UI to update loading state before heavy processing
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    try {
-      await Promise.all(algorithms.map(async (algo) => {
-        try {
-          // Allow UI to breathe
-          await new Promise(resolve => setTimeout(resolve, 10));
+    // 将数据下发给 ResultBoard，ResultBoard 内的每个卡片会独立响应 triggerId 的变化并执行计算
+    setTestPayload({
+      data,
+      executionCount,
+      triggerId: Date.now()
+    });
 
-          let totalCompressTime = 0;
-          let totalDecompressTime = 0;
-          let finalCompressedData: Uint8Array = new Uint8Array();
-          let finalDecompressedData: Uint8Array = new Uint8Array();
-          let finalIsMatch = false;
-
-          for (let iter = 0; iter < executionCount; iter++) {
-            // 1. Compress
-            const startCompress = performance.now();
-            const compressedData = await compressData(data, algo);
-            const endCompress = performance.now();
-            totalCompressTime += (endCompress - startCompress);
-
-            // 2. Decompress
-            const startDecompress = performance.now();
-            const decompressedData = await decompressData(compressedData, algo);
-            const endDecompress = performance.now();
-            totalDecompressTime += (endDecompress - startDecompress);
-
-            if (iter === executionCount - 1) {
-              finalCompressedData = compressedData;
-              finalDecompressedData = decompressedData;
-              
-              // 3. Verify on last iteration
-              finalIsMatch = data.length === decompressedData.length;
-              if (finalIsMatch) {
-                for (let i = 0; i < data.length; i++) {
-                  if (data[i] !== decompressedData[i]) {
-                    finalIsMatch = false;
-                    break;
-                  }
-                }
-              }
-            }
-            
-            if (iter % 10 === 0) {
-              await new Promise(resolve => setTimeout(resolve, 0));
-            }
-          }
-
-          const result: Stats = {
-            algorithm: algo,
-            originalSize: data.length,
-            compressedSize: finalCompressedData.length,
-            compressTime: totalCompressTime,
-            decompressTime: totalDecompressTime,
-            avgCompressTime: totalCompressTime / executionCount,
-            avgDecompressTime: totalDecompressTime / executionCount,
-            decompressedSize: finalDecompressedData.length,
-            ratio: ((finalCompressedData.length / data.length) * 100).toFixed(2) + '%',
-            isMatch: finalIsMatch,
-            executionCount,
-            compressedData: finalCompressedData,
-            decompressedData: finalDecompressedData,
-            loading: false,
-          };
-
-          setStatsList(prev => prev.map(s => s.algorithm === algo ? result : s));
-        } catch (err: unknown) {
-          const errorResult: Stats = {
-            algorithm: algo,
-            originalSize: data.length,
-            compressedSize: 0,
-            compressTime: 0,
-            decompressTime: 0,
-            avgCompressTime: 0,
-            avgDecompressTime: 0,
-            decompressedSize: 0,
-            ratio: 'N/A',
-            isMatch: false,
-            executionCount,
-            error: (err as Error)?.message || '压缩失败',
-            loading: false,
-          };
-          setStatsList(prev => prev.map(s => s.algorithm === algo ? errorResult : s));
-        }
-      }));
-
-      message.success(`压缩与解压测试完成！(循环 ${executionCount} 次)`);
-    } catch (error) {
-      console.error(error);
-      message.error('处理过程中发生未知错误');
-    } finally {
+    // 稍微延迟关闭 loading，或者直接关闭，因为卡片内部有自己的 loading
+    setTimeout(() => {
       setLoading(false);
-    }
+      message.success(`已下发执行任务 (循环 ${executionCount} 次)`);
+    }, 100);
   };
 
   const handleRunTest = async () => {
@@ -243,7 +148,7 @@ const App: React.FC = () => {
         <Title level={3} style={{ margin: 0 }}>压缩与解压性能测试工具</Title>
       </Header>
       <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
-        <Card bordered={false} style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
+        <Card variant="borderless" style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>
           <InputPanel
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -251,7 +156,7 @@ const App: React.FC = () => {
             setTextInput={setTextInput}
             fileList={fileList}
             setFileList={setFileList}
-            onClearResults={() => setStatsList([])}
+            onClearResults={() => setTestPayload(null)}
             onGenerateRandomText={handleGenerateRandomText}
             randomLength={randomLength}
             setRandomLength={setRandomLength}
@@ -271,7 +176,8 @@ const App: React.FC = () => {
           />
 
           <ResultBoard
-            statsList={statsList}
+            algorithms={algorithms}
+            payload={testPayload}
             originalFileName={originalFileName}
           />
         </Card>

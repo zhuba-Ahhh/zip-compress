@@ -2,7 +2,7 @@ import React, { memo, useCallback } from 'react';
 import { Tabs, Input, Button, Upload, Space, InputNumber, Slider, Typography, Row, Col } from 'antd';
 import { FileTextOutlined, UploadOutlined, CodeOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
-import { MAX_FILE_SIZE_HINT } from '../common';
+import { MAX_FILE_SIZE_HINT } from '@/common';
 
 const { TextArea } = Input;
 const { Text } = Typography;

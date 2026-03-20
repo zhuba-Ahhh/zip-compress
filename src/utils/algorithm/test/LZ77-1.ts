@@ -48,7 +48,7 @@ const MIN_MATCH_LENGTH = 3;
 
 // 哈希表参数，用于快速字符串匹配
 const HASH_SHIFT = 5;
-const HASH_MASK = 65535; // 16 bits 哈希空间
+const HASH_MASK = (2 ** 16) - 1; // 16 bits 哈希空间
 
 function lz77Compress(buffer: Uint8Array): Token[] {
   const tokens: Token[] = [];
