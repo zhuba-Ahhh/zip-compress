@@ -1,7 +1,7 @@
 import pako from 'pako';
 import LZString from 'lz-string';
-import { myZipCompress, myZipDecompress } from './algorithm/myzip';
-import { myLZ77Compress, myLZ77Decompress } from './algorithm/test';
+import { myZipCompress, myZipDecompress } from './myzip';
+import { myLZ77Compress, myLZ77Decompress } from './test';
 
 export type CompressionAlgorithm = 'pako' | 'lz-string' | 'myzip' | 'lz77';
 
@@ -10,7 +10,7 @@ export interface CompressionResult {
   decompressedData: Uint8Array;
 }
 
-export const compressData = (data: Uint8Array, algorithm: CompressionAlgorithm): Uint8Array => {
+export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
   if (algorithm === 'pako') {
     return pako.deflate(data);
   } else if (algorithm === 'lz-string') {
@@ -22,11 +22,11 @@ export const compressData = (data: Uint8Array, algorithm: CompressionAlgorithm):
     return myZipCompress(data);
   } else if (algorithm === 'lz77') {
     return myLZ77Compress(data);
-  }
+  } 
   throw new Error('Unsupported algorithm');
 };
 
-export const decompressData = (compressedData: Uint8Array, algorithm: CompressionAlgorithm): Uint8Array => {
+export const decompressData = async (compressedData: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
   if (algorithm === 'pako') {
     return pako.inflate(compressedData);
   } else if (algorithm === 'lz-string') {
@@ -36,6 +36,6 @@ export const decompressData = (compressedData: Uint8Array, algorithm: Compressio
     return myZipDecompress(compressedData);
   } else if (algorithm === 'lz77') {
     return myLZ77Decompress(compressedData);
-  }
+  } 
   throw new Error('Unsupported algorithm');
 };

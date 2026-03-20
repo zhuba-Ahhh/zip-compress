@@ -6,12 +6,10 @@ import { Stats } from './types';
 import InputPanel from './components/InputPanel';
 import ControlPanel from './components/ControlPanel';
 import ResultBoard from './components/ResultBoard';
+import { STORAGE_KEYS, DEFAULT_VALUES } from './common';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
-
-const ALGORITHMS_STORAGE_KEY = 'compress-ui-algorithms';
-const EXECUTION_COUNT_STORAGE_KEY = 'compress-ui-execution-count';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>('text');
@@ -23,19 +21,37 @@ const App: React.FC = () => {
   // Initialize state from local storage if available
   const [algorithms, setAlgorithms] = useState<CompressionAlgorithm[]>(() => {
     try {
-      const saved = localStorage.getItem(ALGORITHMS_STORAGE_KEY);
-      return saved ? JSON.parse(saved) : ['pako', 'lz-string'];
+      const saved = localStorage.getItem(STORAGE_KEYS.ALGORITHMS);
+      return saved ? JSON.parse(saved) : DEFAULT_VALUES.ALGORITHMS;
     } catch {
-      return ['pako', 'lz-string'];
+      return DEFAULT_VALUES.ALGORITHMS;
     }
   });
   
   const [executionCount, setExecutionCount] = useState<number>(() => {
     try {
-      const saved = localStorage.getItem(EXECUTION_COUNT_STORAGE_KEY);
-      return saved ? parseInt(saved, 10) : 1;
+      const saved = localStorage.getItem(STORAGE_KEYS.EXECUTION_COUNT);
+      return saved ? parseInt(saved, 10) : DEFAULT_VALUES.EXECUTION_COUNT;
     } catch {
-      return 1;
+      return DEFAULT_VALUES.EXECUTION_COUNT;
+    }
+  });
+
+  const [randomLength, setRandomLength] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.RANDOM_LENGTH);
+      return saved ? parseInt(saved, 10) : DEFAULT_VALUES.RANDOM_LENGTH;
+    } catch {
+      return DEFAULT_VALUES.RANDOM_LENGTH;
+    }
+  });
+
+  const [randomness, setRandomness] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.RANDOMNESS);
+      return saved ? parseFloat(saved) : DEFAULT_VALUES.RANDOMNESS;
+    } catch {
+      return DEFAULT_VALUES.RANDOMNESS;
     }
   });
 
@@ -43,17 +59,25 @@ const App: React.FC = () => {
 
   // Update local storage when state changes
   useEffect(() => {
-    localStorage.setItem(ALGORITHMS_STORAGE_KEY, JSON.stringify(algorithms));
+    localStorage.setItem(STORAGE_KEYS.ALGORITHMS, JSON.stringify(algorithms));
   }, [algorithms]);
 
   useEffect(() => {
-    localStorage.setItem(EXECUTION_COUNT_STORAGE_KEY, executionCount.toString());
+    localStorage.setItem(STORAGE_KEYS.EXECUTION_COUNT, executionCount.toString());
   }, [executionCount]);
 
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.RANDOM_LENGTH, randomLength.toString());
+  }, [randomLength]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.RANDOMNESS, randomness.toString());
+  }, [randomness]);
+
   const handleGenerateRandomText = () => {
-      const text = generateRandomText();
-      setTextInput(text);
-      message.success(`已生成 ${text.length} 字符的随机文本`);
+    const text = generateRandomText({ length: randomLength, randomness });
+    setTextInput(text);
+    message.success(`已生成 ${text.length} 字符的随机文本 (随机度: ${randomness})`);
   };
 
   const processData = async (data: Uint8Array) => {
@@ -203,6 +227,10 @@ const App: React.FC = () => {
             setFileList={setFileList}
             onClearResults={() => setStatsList([])}
             onGenerateRandomText={handleGenerateRandomText}
+            randomLength={randomLength}
+            setRandomLength={setRandomLength}
+            randomness={randomness}
+            setRandomness={setRandomness}
           />
 
           <Divider />

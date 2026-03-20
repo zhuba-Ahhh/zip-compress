@@ -1,7 +1,8 @@
 import React from 'react';
 import { Space, Typography, Select, InputNumber, Button } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
-import { CompressionAlgorithm } from '../utils/compress';
+import { CompressionAlgorithm } from '../utils';
+import { ALGORITHM_OPTIONS } from '../common';
 
 const { Text } = Typography;
 
@@ -33,12 +34,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             value={algorithms} 
             onChange={setAlgorithms}
             placeholder="请选择压缩算法"
-            options={[
-              { value: 'pako', label: 'pako (zlib)' },
-              { value: 'lz-string', label: 'lz-string (LZW)' },
-              { value: 'myzip', label: 'myzip (自定义压缩)' },
-              { value: 'lz77', label: 'lz77 (自定义LZ77)' },
-            ]}
+            options={ALGORITHM_OPTIONS}
             style={{ minWidth: 250 }}
           />
         </Space>
