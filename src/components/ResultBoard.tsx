@@ -1,6 +1,6 @@
 import React from 'react';
-import { Row, Col, Card, Descriptions, Typography, Tag, Space, Button } from 'antd';
-import { DownloadOutlined } from '@ant-design/icons';
+import { Row, Col, Card, Descriptions, Typography, Tag, Space, Button, Spin } from 'antd';
+import { DownloadOutlined, SyncOutlined } from '@ant-design/icons';
 import { Stats } from '../types';
 import { formatSize, downloadFile } from '../utils';
 
@@ -25,7 +25,7 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ statsList, originalFileName }
               title={<><Tag color="processing">{stats.algorithm}</Tag>处理详情</>} 
               style={{ background: '#fafafa', height: '100%' }}
               extra={
-                stats.compressedData && !stats.error && (
+                !stats.loading && stats.compressedData && !stats.error && (
                   <Space>
                     <Button 
                       size="small" 
@@ -47,7 +47,12 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ statsList, originalFileName }
                 )
               }
             >
-              {stats.error ? (
+              {stats.loading ? (
+                <div style={{ padding: '40px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                  <Spin indicator={<SyncOutlined spin style={{ fontSize: 24 }} />} />
+                  <div style={{ marginTop: 8, color: '#1890ff' }}>正在处理中...</div>
+                </div>
+              ) : stats.error ? (
                 <div style={{ color: 'red', padding: '20px 0', textAlign: 'center' }}>
                   执行失败: {stats.error}
                 </div>

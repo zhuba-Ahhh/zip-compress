@@ -1,32 +1,34 @@
 import pako from 'pako';
 import LZString from 'lz-string';
 import { myZipCompress, myZipDecompress } from './algorithm/myzip';
-import { myLZ77Compress, myLZ77Decompress } from './algorithm/test';
-
-export type CompressionAlgorithm = 'pako' | 'lz-string' | 'myzip' | 'lz77';
+import { myLZ77Compress, myLZ77Decompress, myLZ771Compress, myLZ771Decompress } from './algorithm/test';
+import { CompressionAlgorithm } from '../common';
 
 export interface CompressionResult {
   compressedData: Uint8Array;
   decompressedData: Uint8Array;
 }
 
-export const compressData = (data: Uint8Array, algorithm: CompressionAlgorithm): Uint8Array => {
-  if (algorithm === 'pako') {
+export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
+  if (algorithm === CompressionAlgorithm.Pako) {
     return pako.deflate(data);
-  } else if (algorithm === 'lz-string') {
+  } else if (algorithm === CompressionAlgorithm.LZString) {
     // lz-string 主要是对字符串进行压缩，对 Uint8Array 的处理需要转换
     const str = new TextDecoder().decode(data);
     const compressedStr = LZString.compressToUint8Array(str);
     return compressedStr;
-  } else if (algorithm === 'myzip') {
+  } else if (algorithm === CompressionAlgorithm.MyZip) {
     return myZipCompress(data);
-  } else if (algorithm === 'lz77') {
+  } else if (algorithm === CompressionAlgorithm.LZ77) {
     return myLZ77Compress(data);
+  } else if (algorithm === CompressionAlgorithm.LZ771) {
+    return myLZ771Compress(data);
+  } else {
+    throw new Error('Unsupported algorithm');
   }
-  throw new Error('Unsupported algorithm');
 };
 
-export const decompressData = (compressedData: Uint8Array, algorithm: CompressionAlgorithm): Uint8Array => {
+export const decompressData = async (compressedData: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
   if (algorithm === 'pako') {
     return pako.inflate(compressedData);
   } else if (algorithm === 'lz-string') {
@@ -36,6 +38,9 @@ export const decompressData = (compressedData: Uint8Array, algorithm: Compressio
     return myZipDecompress(compressedData);
   } else if (algorithm === 'lz77') {
     return myLZ77Decompress(compressedData);
+  } else if (algorithm === 'lz77-1') {
+    return myLZ771Decompress(compressedData);
+  } else {
+    throw new Error('Unsupported algorithm');
   }
-  throw new Error('Unsupported algorithm');
 };

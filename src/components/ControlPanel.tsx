@@ -1,8 +1,7 @@
 import React from 'react';
 import { Space, Typography, Select, InputNumber, Button } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
-import { CompressionAlgorithm } from '../utils';
-import { ALGORITHM_OPTIONS } from '../common';
+import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '../common';
 
 const { Text } = Typography;
 
@@ -35,7 +34,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             onChange={setAlgorithms}
             placeholder="请选择压缩算法"
             options={ALGORITHM_OPTIONS}
-            style={{ minWidth: 250 }}
+            style={{ minWidth: 350 }}
+            optionRender={(option) => (
+              <div style={{ display: 'flex', flexDirection: 'column' }}>
+                <span style={{ fontWeight: 'bold' }}>{option.data.label}</span>
+                <span style={{ fontSize: '12px', color: '#888' }}>{option.data.description}</span>
+              </div>
+            )}
           />
         </Space>
         

@@ -14,4 +14,5 @@ export interface Stats {
   // Store raw data for downloading
   compressedData?: Uint8Array;
   decompressedData?: Uint8Array;
+  loading?: boolean;
 }

@@ -92,15 +92,32 @@ const App: React.FC = () => {
     }
     
     setLoading(true);
-    setStatsList([]);
-    const results: Stats[] = [];
+    
+    const initialStats: Stats[] = algorithms.map(algo => ({
+      algorithm: algo,
+      originalSize: data.length,
+      compressedSize: 0,
+      compressTime: 0,
+      decompressTime: 0,
+      avgCompressTime: 0,
+      avgDecompressTime: 0,
+      decompressedSize: 0,
+      ratio: '',
+      isMatch: false,
+      executionCount,
+      loading: true,
+    }));
+    setStatsList(initialStats);
 
     // Allow UI to update loading state before heavy processing
     await new Promise(resolve => setTimeout(resolve, 50));
 
     try {
-      for (const algo of algorithms) {
+      await Promise.all(algorithms.map(async (algo) => {
         try {
+          // Allow UI to breathe
+          await new Promise(resolve => setTimeout(resolve, 10));
+
           let totalCompressTime = 0;
           let totalDecompressTime = 0;
           let finalCompressedData: Uint8Array = new Uint8Array();
@@ -135,9 +152,13 @@ const App: React.FC = () => {
                 }
               }
             }
+            
+            if (iter % 10 === 0) {
+              await new Promise(resolve => setTimeout(resolve, 0));
+            }
           }
 
-          results.push({
+          const result: Stats = {
             algorithm: algo,
             originalSize: data.length,
             compressedSize: finalCompressedData.length,
@@ -150,10 +171,13 @@ const App: React.FC = () => {
             isMatch: finalIsMatch,
             executionCount,
             compressedData: finalCompressedData,
-            decompressedData: finalDecompressedData
-          });
+            decompressedData: finalDecompressedData,
+            loading: false,
+          };
+
+          setStatsList(prev => prev.map(s => s.algorithm === algo ? result : s));
         } catch (err: unknown) {
-          results.push({
+          const errorResult: Stats = {
             algorithm: algo,
             originalSize: data.length,
             compressedSize: 0,
@@ -165,11 +189,13 @@ const App: React.FC = () => {
             ratio: 'N/A',
             isMatch: false,
             executionCount,
-            error: (err as Error)?.message || '压缩失败'
-          });
+            error: (err as Error)?.message || '压缩失败',
+            loading: false,
+          };
+          setStatsList(prev => prev.map(s => s.algorithm === algo ? errorResult : s));
         }
-      }
-      setStatsList(results);
+      }));
+
       message.success(`压缩与解压测试完成！(循环 ${executionCount} 次)`);
     } catch (error) {
       console.error(error);

@@ -26,7 +26,7 @@ const WINDOW_SIZE = (2 ** 12) - 1;
 const MAX_MATCH_LENGTH = (2 ** 8) - 1; // 8 bits 最大长度
 const MIN_MATCH_LENGTH = 3; // 最小匹配长度
 
-function lz77Compress(data: Uint8Array): Token[] {
+export function lz77Compress(data: Uint8Array): Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
   const dataLength = data.length;
@@ -64,7 +64,7 @@ function lz77Compress(data: Uint8Array): Token[] {
   return tokens;
 }
 
-function huffmanCompress(tokens: Token[]): Uint8Array {
+export function huffmanCompress(_tokens: Token[]): Uint8Array {
   // 实现 Huffman 编码
   return new Uint8Array();
 }
@@ -74,7 +74,7 @@ function huffmanCompress(tokens: Token[]): Uint8Array {
  * 用于将压缩后的数据写入到 Uint8Array 中
  * 每个 byte 用于存储 8 位数据
  */
-class BitWriter {
+export class BitWriter {
   private bytes: number[] = [];
   private currentByte: number = 0;
   private bitPosition: number = 0;
@@ -114,7 +114,7 @@ class BitWriter {
   }
 }
 
-class BitReader {
+export class BitReader {
   private bytes: Uint8Array;
   private bytePosition: number = 0;
   private bitPosition: number = 0;
