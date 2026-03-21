@@ -1,7 +1,7 @@
 import pako from 'pako';
 import LZString from 'lz-string';
 import { myZipCompress, myZipDecompress } from './algorithm/myzip';
-import { myLZ77Compress, myLZ77Decompress, myLZ771Compress, myLZ771Decompress } from './algorithm/test';
+import { myLZ77Compress, myLZ77Decompress, myLZ771Compress, myLZ771Decompress, myHuffmanCompress, myHuffmanDecompress, myHuffman1Compress, myHuffman1Decompress, myLZ772Compress, myLZ772Decompress, myHuffman2Compress, myHuffman2Decompress } from './algorithm/test';
 import { CompressionAlgorithm } from '../common';
 
 export interface CompressionResult {
@@ -9,38 +9,48 @@ export interface CompressionResult {
   decompressedData: Uint8Array;
 }
 
-export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
-  if (algorithm === CompressionAlgorithm.Pako) {
-    return pako.deflate(data);
-  } else if (algorithm === CompressionAlgorithm.LZString) {
-    // lz-string 主要是对字符串进行压缩，对 Uint8Array 的处理需要转换
+const compressors: Record<string, (data: Uint8Array) => Uint8Array | Promise<Uint8Array>> = {
+  [CompressionAlgorithm.Pako]: (data) => pako.deflate(data),
+  [CompressionAlgorithm.LZString]: (data) => {
     const str = new TextDecoder().decode(data);
-    const compressedStr = LZString.compressToUint8Array(str);
-    return compressedStr;
-  } else if (algorithm === CompressionAlgorithm.MyZip) {
-    return myZipCompress(data);
-  } else if (algorithm === CompressionAlgorithm.LZ77) {
-    return myLZ77Compress(data);
-  } else if (algorithm === CompressionAlgorithm.LZ771) {
-    return myLZ771Compress(data);
-  } else {
-    throw new Error('Unsupported algorithm');
+    return LZString.compressToUint8Array(str);
+  },
+  [CompressionAlgorithm.MyZip]: myZipCompress,
+  [CompressionAlgorithm.LZ77]: myLZ77Compress,
+  [CompressionAlgorithm.LZ771]: myLZ771Compress,
+  [CompressionAlgorithm.LZ772]: myLZ772Compress,
+  [CompressionAlgorithm.Huffman]: myHuffmanCompress,
+  [CompressionAlgorithm.Huffman1]: myHuffman1Compress,
+  [CompressionAlgorithm.Huffman2]: myHuffman2Compress,
+};
+
+const deCompressors: Record<string, (data: Uint8Array) => Uint8Array | Promise<Uint8Array>> = {
+  [CompressionAlgorithm.Pako]: (data) => pako.inflate(data),
+  [CompressionAlgorithm.LZString]: (data) => {
+    const decompressedStr = LZString.decompressFromUint8Array(data);
+    return new TextEncoder().encode(decompressedStr);
+  },
+  [CompressionAlgorithm.MyZip]: myZipDecompress,
+  [CompressionAlgorithm.LZ77]: myLZ77Decompress,
+  [CompressionAlgorithm.LZ771]: myLZ771Decompress,
+  [CompressionAlgorithm.LZ772]: myLZ772Decompress,
+  [CompressionAlgorithm.Huffman]: myHuffmanDecompress,
+  [CompressionAlgorithm.Huffman1]: myHuffman1Decompress,
+  [CompressionAlgorithm.Huffman2]: myHuffman2Decompress,
+};
+
+export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
+  const compressor = compressors[algorithm];
+  if (!compressor) {
+    throw new Error(`Unsupported algorithm: ${algorithm}`);
   }
+  return compressor(data);
 };
 
 export const decompressData = async (compressedData: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
-  if (algorithm === 'pako') {
-    return pako.inflate(compressedData);
-  } else if (algorithm === 'lz-string') {
-    const decompressedStr = LZString.decompressFromUint8Array(compressedData);
-    return new TextEncoder().encode(decompressedStr);
-  } else if (algorithm === 'myzip') {
-    return myZipDecompress(compressedData);
-  } else if (algorithm === 'lz77') {
-    return myLZ77Decompress(compressedData);
-  } else if (algorithm === 'lz77-1') {
-    return myLZ771Decompress(compressedData);
-  } else {
-    throw new Error('Unsupported algorithm');
+  const decompressor = deCompressors[algorithm];
+  if (!decompressor) {
+    throw new Error(`Unsupported algorithm: ${algorithm}`);
   }
+  return decompressor(compressedData);
 };

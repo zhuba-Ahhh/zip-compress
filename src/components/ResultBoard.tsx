@@ -136,12 +136,14 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
 
   if (!stats) return null;
 
+  const algorithmName = ALGORITHM_OPTIONS.find(item => item.value === stats.algorithm);
+
   return (
     <Card
       type="inner"
       title={
         <>
-          <Tooltip title={ALGORITHM_OPTIONS.find(item => item.value === stats.algorithm)?.description || ''}>
+          <Tooltip title={algorithmName?.description || ''}>
             <Tag color="processing">
               {stats.algorithm}
             </Tag>
@@ -183,7 +185,10 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
           执行失败: {stats.error}
         </div>
       ) : (
-        <Descriptions column={1} size="small">
+            <Descriptions column={2} size="small">
+              <Descriptions.Item label="算法" span={2}>
+                <Text strong>{algorithmName?.description || stats.algorithm}</Text>
+              </Descriptions.Item>
           <Descriptions.Item label="原始大小">
             <Text strong>{formatSize(stats.originalSize)}</Text> ({stats.originalSize} B)
           </Descriptions.Item>
@@ -223,7 +228,7 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
     <div style={{ marginTop: 24 }}>
       <Title level={4}>测试结果对比 (循环 {payload.executionCount} 次)</Title>
       <Row gutter={[16, 16]}>
-        {algorithms.map((algo) => (
+        {algorithms.sort((a, b) => a.localeCompare(b)).map((algo) => (
           <Col xs={24} md={algorithms.length > 1 ? 12 : 24} key={`${algo}-${payload.triggerId}`}>
             <AlgorithmCard
               algorithm={algo}
