@@ -167,11 +167,12 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
           )
         }
       >
-        {stats.loading ? (
-          <div style={{ padding: '40px 0', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <Spin indicator={<SyncOutlined spin style={{ fontSize: 24, marginBottom: 16 }} />} />
-            {payload.executionCount > 1 ? (
-              <div style={{ width: '80%', marginTop: 16 }}>
+        <Spin
+          spinning={stats.loading}
+          indicator={<SyncOutlined spin style={{ fontSize: 24, marginBottom: 8 }} />}
+          tip={
+            payload.executionCount > 1 ? (
+              <div style={{ width: '80%', margin: '0 auto', marginTop: 8 }}>
                 <Progress
                   percent={Math.round((progress / payload.executionCount) * 100)}
                   format={() => `${zhCN.currentProgress}: ${progress}/${payload.executionCount}`}
@@ -179,39 +180,51 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
               </div>
             ) : (
               <div style={{ marginTop: 8, color: '#1890ff' }}>{zhCN.processing}</div>
-            )}
-          </div>
-        ) : stats.error ? (
-          <div style={{ color: 'red', padding: '20px 0', textAlign: 'center' }}>
-            {zhCN.executionFailed}: {stats.error}
-          </div>
-        ) : (
-          <Descriptions column={2} size="small">
-            <Descriptions.Item label={zhCN.algorithm} span={2}>
-              <Text strong ellipsis={{ tooltip: algorithmName?.description || '' }}>{algorithmName?.description || stats.algorithm}</Text>
-            </Descriptions.Item>
-            <Descriptions.Item label={zhCN.originalSize}>
-              <Text strong>{formatSize(stats.originalSize)}</Text> ({stats.originalSize} B)
-            </Descriptions.Item>
-            <Descriptions.Item label={zhCN.compressedSize}>
-              <Text strong type="success">{formatSize(stats.compressedSize)}</Text> ({stats.compressedSize} B)
-            </Descriptions.Item>
-            <Descriptions.Item label={zhCN.compressionRatio}>
-              <Tag color="blue">{stats.ratio}</Tag>
-            </Descriptions.Item>
-            <Descriptions.Item label={zhCN.avgCompressTime}>
-              <Text type="warning">{stats.avgCompressTime.toFixed(2)} ms</Text>
-              {stats.executionCount > 1 && <Text type="secondary" style={{ fontSize: '12px', marginLeft: 8 }}>({zhCN.total}: {stats.compressTime.toFixed(2)} ms)</Text>}
-            </Descriptions.Item>
-            <Descriptions.Item label={zhCN.avgDecompressTime}>
-              <Text type="warning">{stats.avgDecompressTime.toFixed(2)} ms</Text>
-              {stats.executionCount > 1 && <Text type="secondary" style={{ fontSize: '12px', marginLeft: 8 }}>({zhCN.total}: {stats.decompressTime.toFixed(2)} ms)</Text>}
-            </Descriptions.Item>
-            <Descriptions.Item label={zhCN.dataConsistency}>
-              {stats.isMatch ? <Tag color="success">{zhCN.verificationPassed}</Tag> : <Tag color="error">{zhCN.dataCorrupted}</Tag>}
-            </Descriptions.Item>
-          </Descriptions>
-        )}
+            )
+          }
+        >
+          {stats.error ? (
+            <div style={{ color: 'red', padding: '40px 0', textAlign: 'center' }}>
+              {zhCN.executionFailed}: {stats.error}
+            </div>
+          ) : (
+              <Descriptions column={2} size="small" style={{ minHeight: 140 }}>
+                <Descriptions.Item label={zhCN.algorithm} span={2}>
+                  <Text strong ellipsis={{ tooltip: algorithmName?.description || '' }}>{algorithmName?.description || stats.algorithm}</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label={zhCN.originalSize}>
+                  <Text strong>{formatSize(stats.originalSize)}</Text> ({stats.originalSize} B)
+                </Descriptions.Item>
+                <Descriptions.Item label={zhCN.compressedSize}>
+                  <Text strong type="success">{formatSize(stats.compressedSize)}</Text> ({stats.compressedSize} B)
+                </Descriptions.Item>
+                <Descriptions.Item label={zhCN.compressionRatio}>
+                  <Tag color="blue">{stats.ratio || '-'}</Tag>
+                </Descriptions.Item>
+                <Descriptions.Item label={zhCN.dataConsistency}>
+                  {!stats.loading && stats.ratio !== '' && (
+                    stats.isMatch ? <Tag color="success">{zhCN.verificationPassed}</Tag> : <Tag color="error">{zhCN.dataCorrupted}</Tag>
+                  )}
+                </Descriptions.Item>
+                <Descriptions.Item label={zhCN.avgCompressTime}>
+                  <Text type="warning">{stats.avgCompressTime.toFixed(2)} ms</Text>
+                </Descriptions.Item>
+                <Descriptions.Item label={zhCN.avgDecompressTime}>
+                  <Text type="warning">{stats.avgDecompressTime.toFixed(2)} ms</Text>
+                </Descriptions.Item>
+                {stats.executionCount > 1 && (
+                  <Descriptions.Item label={`${zhCN.total}${zhCN.compressionTime}`}>
+                    <Text type="secondary">{stats.compressTime.toFixed(2)} ms</Text>
+                  </Descriptions.Item>
+                )}
+                {stats.executionCount > 1 && (
+                  <Descriptions.Item label={`${zhCN.total}${zhCN.decompressionTime}`}>
+                    <Text type="secondary">{stats.decompressTime.toFixed(2)} ms</Text>
+                  </Descriptions.Item>
+                )}
+            </Descriptions>
+          )}
+        </Spin>
       </Card>
       <LogModal
         visible={isLogModalVisible}

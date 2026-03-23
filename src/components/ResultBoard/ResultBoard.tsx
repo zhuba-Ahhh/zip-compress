@@ -74,11 +74,6 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
   return (
     <div style={{ marginTop: 24 }}>
       <Title level={4}>{zhCN.testResultsComparison} ({zhCN.loopTimes} {payload.executionCount} {zhCN.times})</Title>
-      
-      {/* Summary Chart */}
-      {completedCount === algorithms.length && chartData.length > 0 && (
-        <PerformanceChart data={chartData} />
-      )}
 
       <Row gutter={[16, 16]}>
         {algorithms.sort((a, b) => a.localeCompare(b)).map((algo) => (
@@ -92,6 +87,11 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
           </Col>
         ))}
       </Row>
+
+      {/* Summary Chart */}
+      {completedCount === algorithms.length && chartData.length > 0 && (
+        <PerformanceChart data={chartData} />
+      )}
     </div>
   );
 };

@@ -1,11 +1,12 @@
 import { BitWriter } from './BitWriter';
 import { BitReader } from './BitReader';
 import { HuffmanNode } from './Huffman';
-import { CompressionLog } from '../../../types';
+import { PhaseTiming, CompressionLog } from '../../../types';
 
 export interface MyZipCompressResult {
   data: Uint8Array;
   logs?: CompressionLog[];
+  phases?: PhaseTiming[];
 }
 
 /**
@@ -21,6 +22,15 @@ export interface MyZipCompressResult {
 export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | MyZipCompressResult {
   const len = buffer.length;
   const logs: CompressionLog[] = [];
+  const phases: PhaseTiming[] = [];
+
+  const trackPhase = (name: string, fn: () => void) => {
+    const start = performance.now();
+    fn();
+    if (collectLogs) {
+      phases.push({ name, duration: performance.now() - start });
+    }
+  };
   
   const addLog = (phase: string, message: string, details?: unknown) => {
     if (collectLogs) {
@@ -30,13 +40,15 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
 
   if (len === 0) {
     const emptyResult = new Uint8Array(0);
-    return collectLogs ? { data: emptyResult, logs } : emptyResult;
+    return collectLogs ? { data: emptyResult, logs, phases } : emptyResult;
   }
 
-  addLog('初始化', `开始压缩，共 ${len} 字节`);
-
-  const writer = new BitWriter(Math.max(len + 16, 1024));
-  writer.writeBits(len, 32);
+  let writer!: BitWriter;
+  trackPhase('初始化', () => {
+    addLog('初始化', `开始压缩，共 ${len} 字节`);
+    writer = new BitWriter(Math.max(len + 16, 1024));
+    writer.writeBits(len, 32);
+  });
 
   const tokens: number[] = [];
   const WINDOW_SIZE = 32768; 
@@ -95,9 +107,10 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
 
   const freqs = new Int32Array(256).fill(0);
 
-  addLog('LZ77匹配', '开始执行 LZ77 匹配过程');
+  trackPhase('LZ77匹配(Pass 1)', () => {
+    addLog('LZ77匹配', '开始执行 LZ77 匹配过程');
 
-  while (cursor < len) {
+    while (cursor < len) {
     insertString(cursor);
     const match = findMatch(cursor);
 
@@ -147,108 +160,143 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   }
 
   addLog('LZ77完成', `LZ77 匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`);
+  });
 
-  const nodes: HuffmanNode[] = [];
-  for (let i = 0; i < 256; i++) {
-    if (freqs[i] > 0) {
-      nodes.push(new HuffmanNode(i, freqs[i]));
+  let root!: HuffmanNode;
+  trackPhase('构建Huffman树', () => {
+    const nodes: HuffmanNode[] = [];
+    for (let i = 0; i < 256; i++) {
+      if (freqs[i] > 0) {
+        nodes.push(new HuffmanNode(i, freqs[i]));
+      }
     }
-  }
 
-  if (nodes.length === 0) {
-    nodes.push(new HuffmanNode(0, 1));
-  }
+    if (nodes.length === 0) {
+      nodes.push(new HuffmanNode(0, 1));
+    }
 
-  while (nodes.length > 1) {
-    nodes.sort((a, b) => b.freq - a.freq);
-    const right = nodes.pop()!;
-    const left = nodes.pop()!;
-    const parent = new HuffmanNode(null, left.freq + right.freq);
-    parent.left = left;
-    parent.right = right;
-    nodes.push(parent);
-  }
-  const root = nodes[0];
-
-  addLog('Huffman建树', 'Huffman 树构建成功', { rootNodesWeight: root.freq });
+    while (nodes.length > 1) {
+      nodes.sort((a, b) => b.freq - a.freq);
+      const right = nodes.pop()!;
+      const left = nodes.pop()!;
+      const parent = new HuffmanNode(null, left.freq + right.freq);
+      parent.left = left;
+      parent.right = right;
+      nodes.push(parent);
+    }
+    root = nodes[0];
+  });
 
   const huffmanCodes: { [key: number]: { code: number, len: number } } = {};
-
-  const buildCodes = (node: HuffmanNode | null, code: number, length: number) => {
-    if (!node) return;
-    if (node.value !== null) {
-      huffmanCodes[node.value] = { code, len: length };
-      return;
-    }
-    buildCodes(node.left, (code << 1) | 0, length + 1);
-    buildCodes(node.right, (code << 1) | 1, length + 1);
-  };
-  buildCodes(root, 0, 0);
-
-  const gammaLength = (value: number) => {
-    if (value <= 0) return 0;
-    return 2 * Math.floor(Math.log2(value)) + 1;
-  };
-
+  
   let expectedBits = 0;
-  for (let i = 0; i < 256; i++) {
-    expectedBits += gammaLength(freqs[i] + 1);
-  }
+  trackPhase('构建树与编码', () => {
+    const buildCodes = (node: HuffmanNode | null, code: number, length: number) => {
+      if (!node) return;
+      if (node.value !== null) {
+        huffmanCodes[node.value] = { code, len: length };
+        return;
+      }
+      buildCodes(node.left, (code << 1) | 0, length + 1);
+      buildCodes(node.right, (code << 1) | 1, length + 1);
+    };
+    buildCodes(root, 0, 0);
 
-  for (const token of tokens) {
-    expectedBits += 1;
-    if (token >= 0) {
-      expectedBits += huffmanCodes[token].len;
-    } else {
-      const val = -token;
-      const dist = val >> 12;
-      const matchLen = val & 0xFFF;
-      expectedBits += gammaLength(dist);
-      expectedBits += gammaLength(matchLen - MIN_MATCH_LENGTH + 1);
+    if (collectLogs) {
+      const sortedSymbols = Object.entries(huffmanCodes)
+        .map(([sym, huff]) => ({
+          symbol: parseInt(sym) < 256 ? String.fromCharCode(parseInt(sym)) : `SPECIAL_${parseInt(sym)}`,
+          freq: freqs[parseInt(sym)],
+          codeStr: huff.code.toString(2).padStart(huff.len, '0'),
+          bitLength: huff.len
+        }))
+        .sort((a, b) => b.freq - a.freq)
+        .slice(0, 10);
+        
+      addLog('Huffman建树', '动态 Huffman 树构建成功', {
+        independentCharSetSize: Object.keys(huffmanCodes).length,
+        rootNodesWeight: root.freq,
+        topSymbols: sortedSymbols
+      });
     }
-  }
 
-  addLog('容量预估', `预期压缩后位数: ${expectedBits}, 原始位数: ${len * 8}`);
+    const gammaLength = (value: number) => {
+      if (value <= 0) return 0;
+      return 2 * Math.floor(Math.log2(value)) + 1;
+    };
+
+    for (let i = 0; i < 256; i++) {
+      expectedBits += gammaLength(freqs[i] + 1);
+    }
+
+    for (const token of tokens) {
+      expectedBits += 1;
+      if (token >= 0) {
+        expectedBits += huffmanCodes[token].len;
+      } else {
+        const val = -token;
+        const dist = val >> 12;
+        const matchLen = val & 0xFFF;
+        expectedBits += gammaLength(dist);
+        expectedBits += gammaLength(matchLen - MIN_MATCH_LENGTH + 1);
+      }
+    }
+
+    addLog('容量预估', `预期压缩后位数: ${expectedBits}, 原始位数: ${len * 8}`);
+  });
 
   if (expectedBits >= len * 8) {
     addLog('回退机制', '压缩效果不佳，回退为存储原始数据。');
     writer.writeBit(0);
     writer.writeBytes(buffer);
     const resultData = writer.flush();
-    return collectLogs ? { data: resultData, logs } : resultData;
+    return collectLogs ? { data: resultData, logs, phases } : resultData;
   }
 
-  writer.writeBit(1);
+  trackPhase('位流封装', () => {
+    writer.writeBit(1);
 
-  for (let i = 0; i < 256; i++) {
-    writer.writeGamma(freqs[i] + 1);
-  }
-
-  addLog('编码写入', '正在将 Token 写入位流...');
-
-  for (const token of tokens) {
-    if (token >= 0) {
-      writer.writeBit(0);
-      const huff = huffmanCodes[token];
-      writer.writeBits(huff.code, huff.len);
-    } else {
-      const val = -token;
-      const dist = val >> 12;
-      const matchLen = val & 0xFFF;
-      writer.writeBit(1);
-      writer.writeGamma(dist);
-      writer.writeGamma(matchLen - MIN_MATCH_LENGTH + 1);
+    for (let i = 0; i < 256; i++) {
+      writer.writeGamma(freqs[i] + 1);
     }
-  }
 
-  const resultData = writer.flush();
-  addLog('压缩完成', `压缩结束。最终大小: ${resultData.length} 字节`);
-  return collectLogs ? { data: resultData, logs } : resultData;
+    addLog('编码写入', '正在将 Token 写入位流...');
+
+    for (const token of tokens) {
+      if (token >= 0) {
+        writer.writeBit(0);
+        const huff = huffmanCodes[token];
+        writer.writeBits(huff.code, huff.len);
+      } else {
+        const val = -token;
+        const dist = val >> 12;
+        const matchLen = val & 0xFFF;
+        writer.writeBit(1);
+        writer.writeGamma(dist);
+        writer.writeGamma(matchLen - MIN_MATCH_LENGTH + 1);
+      }
+    }
+
+    const resultData = writer.flush();
+    addLog('压缩完成', `压缩结束。最终大小: ${resultData.length} 字节`);
+  });
+  
+  const resultDataFinal = writer.flush();
+  return collectLogs ? { data: resultDataFinal, logs, phases } : resultDataFinal;
 }
 
 export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | MyZipCompressResult {
   const reader = new BitReader(buffer);
   const logs: CompressionLog[] = [];
+  const phases: PhaseTiming[] = [];
+
+  const trackPhase = (name: string, fn: () => void) => {
+    const start = performance.now();
+    fn();
+    if (collectLogs) {
+      phases.push({ name, duration: performance.now() - start });
+    }
+  };
 
   const addLog = (phase: string, message: string, details?: unknown) => {
     if (collectLogs) {
@@ -256,121 +304,134 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
     }
   };
 
-  addLog('初始化', `开始解压，输入大小 ${buffer.length} 字节`);
+  let expectedLength = 0;
+  let isCompressed: number | null = null;
+  
+  trackPhase('初始化', () => {
+    addLog('初始化', `开始解压，输入大小 ${buffer.length} 字节`);
 
-  const expectedLength = reader.readBits(32);
-  if (expectedLength === null) {
-    const res = new Uint8Array(0);
-    return collectLogs ? { data: res, logs } : res;
-  }
+    const len = reader.readBits(32);
+    if (len !== null) expectedLength = len;
+  });
+
   if (expectedLength === 0) {
     const res = new Uint8Array(0);
-    return collectLogs ? { data: res, logs } : res;
+    return collectLogs ? { data: res, logs, phases } : res;
   }
 
-  addLog('解析头部', `预期解压后大小: ${expectedLength} 字节`);
+  trackPhase('解析头部', () => {
+    addLog('解析头部', `预期解压后大小: ${expectedLength} 字节`);
+    isCompressed = reader.readBit();
+  });
 
-  const isCompressed = reader.readBit();
   if (isCompressed === null) {
     const res = new Uint8Array(0);
-    return collectLogs ? { data: res, logs } : res;
+    return collectLogs ? { data: res, logs, phases } : res;
   }
 
   if (isCompressed === 0) {
     addLog('解码', '数据以原始字节存储，直接提取。');
     const raw = reader.readBytes(expectedLength);
     const res = raw || new Uint8Array(0);
-    return collectLogs ? { data: res, logs } : res;
+    return collectLogs ? { data: res, logs, phases } : res;
   }
 
-  const freqs = new Int32Array(256);
-  const nodes: HuffmanNode[] = [];
+  let root: HuffmanNode | null = null;
 
-  for (let i = 0; i < 256; i++) {
-    const freq = reader.readGamma();
-    if (freq === null) {
-      const res = new Uint8Array(0);
-      return collectLogs ? { data: res, logs } : res;
+  trackPhase('Huffman重建', () => {
+    const freqs = new Int32Array(256);
+    const nodes: HuffmanNode[] = [];
+
+    for (let i = 0; i < 256; i++) {
+      const freq = reader.readGamma();
+      if (freq === null) {
+        return; // will handle gracefully
+      }
+      freqs[i] = freq - 1; 
+      if (freqs[i] > 0) {
+        nodes.push(new HuffmanNode(i, freqs[i]));
+      }
     }
-    freqs[i] = freq - 1; 
-    if (freqs[i] > 0) {
-      nodes.push(new HuffmanNode(i, freqs[i]));
+
+    if (nodes.length === 0) {
+      nodes.push(new HuffmanNode(0, 1));
     }
-  }
 
-  if (nodes.length === 0) {
-    nodes.push(new HuffmanNode(0, 1));
-  }
+    while (nodes.length > 1) {
+      nodes.sort((a, b) => b.freq - a.freq);
+      const right = nodes.pop()!;
+      const left = nodes.pop()!;
+      const parent = new HuffmanNode(null, left.freq + right.freq);
+      parent.left = left;
+      parent.right = right;
+      nodes.push(parent);
+    }
+    root = nodes[0];
 
-  while (nodes.length > 1) {
-    nodes.sort((a, b) => b.freq - a.freq);
-    const right = nodes.pop()!;
-    const left = nodes.pop()!;
-    const parent = new HuffmanNode(null, left.freq + right.freq);
-    parent.left = left;
-    parent.right = right;
-    nodes.push(parent);
-  }
-  const root = nodes[0];
-
-  addLog('Huffman重建', 'Huffman 树重建成功');
+    addLog('Huffman重建', 'Huffman 树重建成功', {
+      restoredLeavesCount: freqs.filter(f => f > 0).length,
+      rootWeight: root.freq
+    });
+  });
 
   const output = new Uint8Array(expectedLength);
-  let outPos = 0;
+  
+  trackPhase('解码', () => {
+    let outPos = 0;
+    const MIN_MATCH_LENGTH = 3;
+    let matchCount = 0;
+    let literalCount = 0;
 
-  const MIN_MATCH_LENGTH = 3;
-  let matchCount = 0;
-  let literalCount = 0;
+    addLog('解码', '正在解码位流...');
 
-  addLog('解码', '正在解码位流...');
+    while (outPos < expectedLength) {
+      const flag = reader.readBit();
+      if (flag === null) break;
 
-  while (outPos < expectedLength) {
-    const flag = reader.readBit();
-    if (flag === null) break;
+      if (flag === 0) {
+        let curr: HuffmanNode | null = root;
+        while (curr && curr.value === null) {
+          const bit = reader.readBit();
+          if (bit === null) break;
+          if (bit === 0) curr = curr.left;
+          else curr = curr.right;
+        }
 
-    if (flag === 0) {
-      let curr: HuffmanNode | null = root;
-      while (curr && curr.value === null) {
-        const bit = reader.readBit();
-        if (bit === null) break;
-        if (bit === 0) curr = curr.left;
-        else curr = curr.right;
-      }
+        if (!curr || curr.value === null) break;
+        output[outPos++] = curr.value;
+        literalCount++;
+      } else {
+        const distance = reader.readGamma();
+        if (distance === null) break;
 
-      if (!curr || curr.value === null) break;
-      output[outPos++] = curr.value;
-      literalCount++;
-    } else {
-      const distance = reader.readGamma();
-      if (distance === null) break;
+        const lengthOffset = reader.readGamma();
+        if (lengthOffset === null) break;
 
-      const lengthOffset = reader.readGamma();
-      if (lengthOffset === null) break;
+        const length = lengthOffset + MIN_MATCH_LENGTH - 1;
 
-      const length = lengthOffset + MIN_MATCH_LENGTH - 1;
+        if (distance === 0) {
+          break;
+        }
 
-      if (distance === 0) {
-        break;
-      }
+        const startIdx = outPos - distance;
 
-      const startIdx = outPos - distance;
+        if (startIdx < 0) {
+          break; 
+        }
 
-      if (startIdx < 0) {
-        break; 
-      }
-
-      const copyLen = Math.min(length, expectedLength - outPos);
-      for (let i = 0; i < copyLen; i++) {
-        output[outPos++] = output[startIdx + i];
-      }
-      matchCount++;
-      if (collectLogs && matchCount <= 5) {
-        addLog('LZ77解码', `应用匹配: 距离=${distance}, 长度=${length}`);
+        const copyLen = Math.min(length, expectedLength - outPos);
+        for (let i = 0; i < copyLen; i++) {
+          output[outPos++] = output[startIdx + i];
+        }
+        matchCount++;
+        if (collectLogs && matchCount <= 5) {
+          addLog('LZ77解码', `应用匹配: 距离=${distance}, 长度=${length}`);
+        }
       }
     }
-  }
 
-  addLog('解压完成', `解压结束。共处理 ${matchCount} 个匹配和 ${literalCount} 个字面量。`);
+    addLog('解压完成', `解压结束。共处理 ${matchCount} 个匹配和 ${literalCount} 个字面量。`);
+  });
   
-  return collectLogs ? { data: output, logs } : output;
+  return collectLogs ? { data: output, logs, phases } : output;
 }

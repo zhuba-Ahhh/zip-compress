@@ -245,7 +245,7 @@ export function encodeHuffmanDeflate(tokens: Token[], logs?: CompressionLog[]): 
 
     logs.push({ 
       timestamp: performance.now(), 
-      phase: 'Huffman重建', 
+      phase: 'Huffman建树', 
       level: 'info',
       message: '动态 Huffman 树构建成功',
       details: {

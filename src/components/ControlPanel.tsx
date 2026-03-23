@@ -29,7 +29,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-      <Space align="center" size="large">
+      <Space direction="vertical" align="center" size="middle">
         <Space>
           <Text strong>{zhCN.compressionAlgorithms}</Text>
           <Select 
@@ -39,7 +39,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             onChange={setAlgorithms}
             placeholder={zhCN.selectAlgorithm}
             options={ALGORITHM_OPTIONS}
-            style={{ minWidth: 350 }}
+            style={{ minWidth: 350, maxWidth: 600 }}
             optionRender={(option) => (
               <div style={{ display: 'flex', flexDirection: 'column' }}>
                 <span style={{ fontWeight: 'bold' }}>{option.data.label}</span>
@@ -48,25 +48,28 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             )}
           />
         </Space>
-        <Space>
-          <Text strong>{zhCN.executionCount}</Text>
-          <InputNumber 
-            min={1} 
-            max={10000} 
-            value={executionCount} 
-            onChange={(val) => setExecutionCount(val || 1)} 
-            style={{ width: 100 }}
-          />
-        </Space>
 
-        <Space>
-          <Text strong>{zhCN.collectLogsLabel}</Text>
-          <Switch
-            checked={collectLogs}
-            onChange={setCollectLogs}
-            checkedChildren={zhCN.on}
-            unCheckedChildren={zhCN.off}
-          />
+        <Space size="large">
+          <Space>
+            <Text strong>{zhCN.executionCount}</Text>
+            <InputNumber
+              min={1}
+              max={10000}
+              value={executionCount}
+              onChange={(val) => setExecutionCount(val || 1)}
+              style={{ width: 100 }}
+            />
+          </Space>
+
+          <Space>
+            <Text strong>{zhCN.collectLogsLabel}</Text>
+            <Switch
+              checked={collectLogs}
+              onChange={setCollectLogs}
+              checkedChildren={zhCN.on}
+              unCheckedChildren={zhCN.off}
+            />
+          </Space>
         </Space>
       </Space>
 

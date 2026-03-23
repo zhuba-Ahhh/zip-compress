@@ -79,11 +79,26 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEYS.RANDOMNESS, randomness.toString());
   }, [randomness]);
 
-  const handleGenerateRandomText = () => {
+  const handleGenerateRandomText = (showMsg = true) => {
     const text = generateRandomText({ length: randomLength, randomness });
     setTextInput(text);
-    message.success(`${zhCN.generatedRandomText} ${text.length} ${zhCN.charsRandomText} ${randomness})`);
+    if (showMsg) {
+      message.success(`${zhCN.generatedRandomText} ${text.length} ${zhCN.charsRandomText} ${randomness})`);
+    }
   };
+
+  // 使用 useEffect 和 setTimeout 实现简单的防抖（Debounce）
+  // 当 randomLength 或 randomness 改变时，自动生成文本
+  useEffect(() => {
+    // 首次加载由组件挂载时的 useEffect 处理，此处避免与初始加载冲突
+    // 但因为依赖了状态，这里可以直接处理。为了避免初始两次，我们去掉下面那个空的 useEffect
+    const handler = setTimeout(() => {
+      handleGenerateRandomText(false); // 自动生成时不弹窗，避免消息刷屏
+    }, 300); // 300ms 延迟
+    return () => clearTimeout(handler);
+  }, [randomLength, randomness]);
+
+  // 注意：移除了原先的空依赖 useEffect，统一由上面的防抖 useEffect 负责初始化生成
 
   const processData = async (data: Uint8Array) => {
     if (algorithms.length === 0) {
@@ -142,10 +157,6 @@ const App: React.FC = () => {
       reader.readAsArrayBuffer(file);
     }
   };
-
-  useEffect(() => {
-    handleGenerateRandomText();
-  }, []);
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
