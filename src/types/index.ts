@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 export type LogLevel = 'info' | 'debug' | 'warn' | 'error';
 
 export interface CompressionLog {

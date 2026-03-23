@@ -1,4 +1,4 @@
-import { RANDOM_TEXT_CHARS } from '../common';
+import { RANDOM_TEXT_CHARS } from '@/common';
 
 export const generateRandomText = ({ length = 300000, randomness = 0.6 } = {}): string => {
   const chars = RANDOM_TEXT_CHARS;
@@ -25,7 +25,7 @@ export const formatSize = (bytes: number): string => {
 };
 
 export const downloadFile = (data: Uint8Array, filename: string): void => {
-  const blob = new Blob([data]);
+  const blob = new Blob([data as any]);
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

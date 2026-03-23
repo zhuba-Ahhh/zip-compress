@@ -1,9 +1,16 @@
 import pako from 'pako';
 import LZString from 'lz-string';
-import { myZipCompress, myZipDecompress } from './algorithm/myzip';
-import { myLZ77Compress, myLZ77Decompress, myLZ771Compress, myLZ771Decompress, myHuffmanCompress, myHuffmanDecompress, myHuffman1Compress, myHuffman1Decompress, myLZ772Compress, myLZ772Decompress, myHuffman2Compress, myHuffman2Decompress } from './algorithm/test';
-import { CompressionAlgorithm } from '../common';
-import { CompressionLog, PhaseTiming } from '../types';
+import { myZipCompress, myZipDecompress } from '@/utils/algorithm/myzip';
+import { 
+  myLZ77Compress, myLZ77Decompress, 
+  myLZ771Compress, myLZ771Decompress, 
+  myHuffmanCompress, myHuffmanDecompress, 
+  myHuffman1Compress, myHuffman1Decompress, 
+  myLZ772Compress, myLZ772Decompress, 
+  myHuffman2Compress, myHuffman2Decompress 
+} from '@/utils/algorithm/test';
+import { CompressionAlgorithm } from '@/common';
+import { CompressionLog, PhaseTiming } from '@/types';
 
 export interface CompressionResult {
   compressedData: Uint8Array;

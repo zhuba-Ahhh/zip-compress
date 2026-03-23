@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { Modal, Timeline, Typography, Collapse, Tag, Space, Radio, Divider } from 'antd';
 import { InfoCircleOutlined, BugOutlined, WarningOutlined, CloseCircleOutlined } from '@ant-design/icons';
-import { CompressionLog, LogLevel } from '../../types';
-import { formatSize } from '../../utils';
+import { CompressionLog, LogLevel } from '@/types';
+import { formatSize } from '@/utils';
+import { zhCN } from '@/locales/zh-CN';
 
 const { Text } = Typography;
 const { Panel } = Collapse;
@@ -57,21 +58,21 @@ const LogModal: React.FC<LogModalProps> = ({ visible, onCancel, title, logs }) =
 
     return (
       <Collapse ghost size="small" style={{ marginTop: 8, background: '#fcfcfc', border: '1px solid #f0f0f0', borderRadius: 6 }}>
-        <Panel header={<Text type="secondary" style={{ fontSize: 12 }}>🔍 展开调试数据</Text>} key="1">
+        <Panel header={<Text type="secondary" style={{ fontSize: 12 }}>🔍 {zhCN.expandDebugData}</Text>} key="1">
           <div style={{ fontSize: '12px', overflowX: 'auto' }}>
             
             {/* --- LZ77 Pass 1 Metrics --- */}
             {details.totalTokens !== undefined && (
               <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ display: 'block', marginBottom: 4 }}>📈 LZ77 扫描统计</Text>
+                <Text strong style={{ display: 'block', marginBottom: 4 }}>📈 {zhCN.lz77ScanStats}</Text>
                 <Space direction="vertical" size={2} style={{ display: 'flex', background: '#fff', padding: 8, borderRadius: 4, border: '1px dashed #d9d9d9' }}>
-                  <Text><Text type="secondary">总 Token 数:</Text> {details.totalTokens.toLocaleString()}</Text>
-                  <Text><Text type="secondary">独立字符 (Literal):</Text> {details.literals.toLocaleString()}</Text>
-                  <Text><Text type="secondary">字典匹配 (Match):</Text> {details.matches.toLocaleString()}</Text>
-                  <Text><Text type="secondary">最长匹配长度:</Text> {details.longestMatchLen} bytes</Text>
-                  {details.avgMatchLen !== undefined && <Text><Text type="secondary">平均匹配长度:</Text> {details.avgMatchLen} bytes</Text>}
-                  {details.hashCollisions !== undefined && <Text><Text type="secondary">哈希链表碰撞次数:</Text> {details.hashCollisions.toLocaleString()} <Text type="secondary" style={{fontSize: 10}}>(影响寻址性能)</Text></Text>}
-                  {details.compressionRatioLZ77 && <Text><Text type="secondary">本阶段压缩率估算:</Text> <Text type="success" strong>{details.compressionRatioLZ77}</Text></Text>}
+                  <Text><Text type="secondary">{zhCN.totalTokens}:</Text> {details.totalTokens.toLocaleString()}</Text>
+                  <Text><Text type="secondary">{zhCN.independentChars}:</Text> {details.literals.toLocaleString()}</Text>
+                  <Text><Text type="secondary">{zhCN.dictionaryMatches}:</Text> {details.matches.toLocaleString()}</Text>
+                  <Text><Text type="secondary">{zhCN.longestMatchLen}:</Text> {details.longestMatchLen} bytes</Text>
+                  {details.avgMatchLen !== undefined && <Text><Text type="secondary">{zhCN.avgMatchLen}:</Text> {details.avgMatchLen} bytes</Text>}
+                  {details.hashCollisions !== undefined && <Text><Text type="secondary">{zhCN.hashCollisions}:</Text> {details.hashCollisions.toLocaleString()} <Text type="secondary" style={{fontSize: 10}}>({zhCN.impactsAddressing})</Text></Text>}
+                  {details.compressionRatioLZ77 && <Text><Text type="secondary">{zhCN.stageCompressionRatio}:</Text> <Text type="success" strong>{details.compressionRatioLZ77}</Text></Text>}
                 </Space>
               </div>
             )}
@@ -79,22 +80,22 @@ const LogModal: React.FC<LogModalProps> = ({ visible, onCancel, title, logs }) =
             {/* --- Huffman Tree Metrics --- */}
             {details.uniqueSymbolsFound !== undefined && (
               <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ display: 'block', marginBottom: 4 }}>🌳 动态 Huffman 树分析</Text>
+                <Text strong style={{ display: 'block', marginBottom: 4 }}>🌳 {zhCN.huffmanTreeAnalysis}</Text>
                 <Space direction="vertical" size={2} style={{ display: 'flex', background: '#fff', padding: 8, borderRadius: 4, border: '1px dashed #d9d9d9' }}>
-                  <Text><Text type="secondary">独立字符集大小:</Text> {details.uniqueSymbolsFound}</Text>
-                  <Text><Text type="secondary">树最大深度:</Text> {details.maxTreeDepth}</Text>
-                  {details.avgCodeLength !== undefined && <Text><Text type="secondary">平均编码长度:</Text> <Text type="success" strong>{details.avgCodeLength} bits</Text> <Text type="secondary" style={{fontSize: 10}}>(原为 8 bits)</Text></Text>}
+                  <Text><Text type="secondary">{zhCN.independentCharSetSize}:</Text> {details.uniqueSymbolsFound}</Text>
+                  <Text><Text type="secondary">{zhCN.treeMaxDepth}:</Text> {details.maxTreeDepth}</Text>
+                  {details.avgCodeLength !== undefined && <Text><Text type="secondary">{zhCN.avgCodeLength}:</Text> <Text type="success" strong>{details.avgCodeLength} bits</Text> <Text type="secondary" style={{fontSize: 10}}>({zhCN.original8Bits})</Text></Text>}
                 </Space>
               </div>
             )}
 
             {details.topSymbols && (
               <div style={{ marginBottom: '12px' }}>
-                <Text type="secondary" strong>频率最高的前5个字符及对应编码:</Text>
+                <Text type="secondary" strong>{zhCN.top5CharsAndCodes}:</Text>
                 <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px', background: '#fff', padding: '8px 8px 8px 24px', borderRadius: 4, border: '1px dashed #d9d9d9' }}>
                   {details.topSymbols.map((s: { symbol: string, freq: number, codeStr: string, bitLength: number }, i: number) => (
                     <li key={i}>
-                      <Text code>{s.symbol}</Text> : 频次 {s.freq.toLocaleString()}, 编码 <Text code style={{ color: '#1890ff' }}>{s.codeStr}</Text> ({s.bitLength} bits)
+                      <Text code>{s.symbol}</Text> : {zhCN.freq} {s.freq.toLocaleString()}, {zhCN.code} <Text code style={{ color: '#1890ff' }}>{s.codeStr}</Text> ({s.bitLength} bits)
                     </li>
                   ))}
                 </ul>
@@ -104,11 +105,11 @@ const LogModal: React.FC<LogModalProps> = ({ visible, onCancel, title, logs }) =
             {/* --- Bitpacking Metrics --- */}
             {details.encodedLiterals !== undefined && (
               <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ display: 'block', marginBottom: 4 }}>📦 位流封装统计 (Bitpacking)</Text>
+                <Text strong style={{ display: 'block', marginBottom: 4 }}>📦 {zhCN.bitpackingStats}</Text>
                 <Space direction="vertical" size={2} style={{ display: 'flex', background: '#fff', padding: 8, borderRadius: 4, border: '1px dashed #d9d9d9' }}>
-                  <Text><Text type="secondary">写入 Literal 数量:</Text> {details.encodedLiterals.toLocaleString()}</Text>
-                  <Text><Text type="secondary">写入 Match 数量:</Text> {details.encodedMatches.toLocaleString()}</Text>
-                  {details.treeHeaderSize && <Text><Text type="secondary">序列化树头部开销:</Text> {details.treeHeaderSize}</Text>}
+                  <Text><Text type="secondary">{zhCN.writeLiteralCount}:</Text> {details.encodedLiterals.toLocaleString()}</Text>
+                  <Text><Text type="secondary">{zhCN.writeMatchCount}:</Text> {details.encodedMatches.toLocaleString()}</Text>
+                  {details.treeHeaderSize && <Text><Text type="secondary">{zhCN.serializeTreeHeaderOverhead}:</Text> {details.treeHeaderSize}</Text>}
                 </Space>
               </div>
             )}
@@ -116,27 +117,27 @@ const LogModal: React.FC<LogModalProps> = ({ visible, onCancel, title, logs }) =
             {/* --- Final Result Metrics --- */}
             {details.originalBytes !== undefined && (
               <div style={{ marginBottom: 12 }}>
-                <Text strong style={{ display: 'block', marginBottom: 4 }}>✅ 最终压缩报告</Text>
+                <Text strong style={{ display: 'block', marginBottom: 4 }}>✅ {zhCN.finalCompressionReport}</Text>
                 <Space direction="vertical" size={2} style={{ display: 'flex', background: '#f6ffed', padding: 8, borderRadius: 4, border: '1px solid #b7eb8f' }}>
-                  <Text><Text type="secondary">原始体积:</Text> {formatSize(details.originalBytes)} ({details.originalBytes.toLocaleString()} B)</Text>
-                  <Text><Text type="secondary">压缩体积:</Text> <Text type="success" strong>{formatSize(details.compressedBytes)} ({details.compressedBytes.toLocaleString()} B)</Text></Text>
-                  <Text><Text type="secondary">节约空间:</Text> <Text type="success">{formatSize(details.savedBytes)}</Text></Text>
+                  <Text><Text type="secondary">{zhCN.originalVolume}:</Text> {formatSize(details.originalBytes)} ({details.originalBytes.toLocaleString()} B)</Text>
+                  <Text><Text type="secondary">{zhCN.compressedVolume}:</Text> <Text type="success" strong>{formatSize(details.compressedBytes)} ({details.compressedBytes.toLocaleString()} B)</Text></Text>
+                  <Text><Text type="secondary">{zhCN.savedSpace}:</Text> <Text type="success">{formatSize(details.savedBytes)}</Text></Text>
                 </Space>
               </div>
             )}
 
             {/* --- Decompression Metrics --- */}
             {details.restoredUniqueSymbols !== undefined && (
-              <Text><Text type="secondary">成功还原字典集大小:</Text> {details.restoredUniqueSymbols}</Text>
+              <Text><Text type="secondary">{zhCN.restoredDictSize}:</Text> {details.restoredUniqueSymbols}</Text>
             )}
             
             {details.decodedLiterals !== undefined && (
               <div style={{ marginBottom: 12, marginTop: 8 }}>
-                <Text strong style={{ display: 'block', marginBottom: 4 }}>🔓 解码结果</Text>
+                <Text strong style={{ display: 'block', marginBottom: 4 }}>🔓 {zhCN.decodeResults}</Text>
                 <Space direction="vertical" size={2} style={{ display: 'flex', background: '#fff', padding: 8, borderRadius: 4, border: '1px dashed #d9d9d9' }}>
-                  <Text><Text type="secondary">解码 Literal 次数:</Text> {details.decodedLiterals.toLocaleString()}</Text>
-                  <Text><Text type="secondary">解码 Match 次数:</Text> {details.decodedMatches.toLocaleString()}</Text>
-                  <Text><Text type="secondary">写入字节总数:</Text> {details.bytesWritten.toLocaleString()}</Text>
+                  <Text><Text type="secondary">{zhCN.decodeLiteralCount}:</Text> {details.decodedLiterals.toLocaleString()}</Text>
+                  <Text><Text type="secondary">{zhCN.decodeMatchCount}:</Text> {details.decodedMatches.toLocaleString()}</Text>
+                  <Text><Text type="secondary">{zhCN.totalBytesWritten}:</Text> {details.bytesWritten.toLocaleString()}</Text>
                 </Space>
               </div>
             )}
@@ -144,7 +145,7 @@ const LogModal: React.FC<LogModalProps> = ({ visible, onCancel, title, logs }) =
             {/* General String Match Display (if any) */}
             {details.matchedString && (
               <div style={{ marginBottom: '4px' }}>
-                <Text type="secondary">匹配文本: </Text>
+                <Text type="secondary">{zhCN.matchedText}: </Text>
                 <Text code style={{ color: '#eb2f96' }}>{details.matchedString}</Text>
               </div>
             )}
@@ -215,7 +216,7 @@ const LogModal: React.FC<LogModalProps> = ({ visible, onCancel, title, logs }) =
         />
       ) : (
         <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-          没有匹配的日志记录。
+          {zhCN.noMatchingLogs}
         </div>
       )}
     </Modal>

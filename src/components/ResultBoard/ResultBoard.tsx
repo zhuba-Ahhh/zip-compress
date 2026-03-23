@@ -1,9 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Row, Col, Typography } from 'antd';
-import { Stats } from '../../types';
+import { Stats } from '@/types';
 import { CompressionAlgorithm } from '@/common';
 import AlgorithmCard from './AlgorithmCard';
 import PerformanceChart, { ChartData } from './PerformanceChart';
+import { zhCN } from '@/locales/zh-CN';
 
 const { Title } = Typography;
 
@@ -50,7 +51,7 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
       .map(algo => {
         const stat = allStats[algo];
         
-        // 计算吞吐量 MB/s
+        // Calculate throughput MB/s
         const sizeMB = stat.originalSize / (1024 * 1024);
         const compressSpeed = stat.avgCompressTime > 0 ? sizeMB / (stat.avgCompressTime / 1000) : 0;
         const decompressSpeed = stat.avgDecompressTime > 0 ? sizeMB / (stat.avgDecompressTime / 1000) : 0;
@@ -72,9 +73,9 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
 
   return (
     <div style={{ marginTop: 24 }}>
-      <Title level={4}>测试结果对比 (循环 {payload.executionCount} 次)</Title>
+      <Title level={4}>{zhCN.testResultsComparison} ({zhCN.loopTimes} {payload.executionCount} {zhCN.times})</Title>
       
-      {/* 汇总图表 */}
+      {/* Summary Chart */}
       {completedCount === algorithms.length && chartData.length > 0 && (
         <PerformanceChart data={chartData} />
       )}

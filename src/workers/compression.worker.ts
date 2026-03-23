@@ -1,7 +1,6 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { compressData, decompressData } from '../utils/compress';
-import { CompressionAlgorithm } from '../common';
-import { PhaseTiming } from '../types';
+import { compressData, decompressData } from '@/utils/compress';
+import { CompressionAlgorithm } from '@/common';
+import { PhaseTiming } from '@/types';
 
 export interface WorkerMessage {
   id: number;

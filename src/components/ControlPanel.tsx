@@ -2,6 +2,7 @@ import React from 'react';
 import { Space, Typography, Select, InputNumber, Button, Switch } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
 import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
+import { zhCN } from '@/locales/zh-CN';
 
 const { Text } = Typography;
 
@@ -30,13 +31,13 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 24 }}>
       <Space align="center" size="large">
         <Space>
-          <Text strong>压缩算法:</Text>
+          <Text strong>{zhCN.compressionAlgorithms}</Text>
           <Select 
             mode="multiple"
             allowClear
             value={algorithms} 
             onChange={setAlgorithms}
-            placeholder="请选择压缩算法"
+            placeholder={zhCN.selectAlgorithm}
             options={ALGORITHM_OPTIONS}
             style={{ minWidth: 350 }}
             optionRender={(option) => (
@@ -48,7 +49,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
           />
         </Space>
         <Space>
-          <Text strong>执行次数:</Text>
+          <Text strong>{zhCN.executionCount}</Text>
           <InputNumber 
             min={1} 
             max={10000} 
@@ -59,12 +60,12 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         </Space>
 
         <Space>
-          <Text strong>收集日志:</Text>
+          <Text strong>{zhCN.collectLogsLabel}</Text>
           <Switch
             checked={collectLogs}
             onChange={setCollectLogs}
-            checkedChildren="开"
-            unCheckedChildren="关"
+            checkedChildren={zhCN.on}
+            unCheckedChildren={zhCN.off}
           />
         </Space>
       </Space>
@@ -78,7 +79,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
         onClick={onRunTest}
         style={{ minWidth: 200 }}
       >
-        {loading ? '正在执行测试...' : '执行压缩与解压'}
+        {loading ? zhCN.runningTest : zhCN.runCompressionDecompression}
       </Button>
     </div>
   );

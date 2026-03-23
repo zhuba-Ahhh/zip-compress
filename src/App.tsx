@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useState, useEffect } from 'react';
 import { Layout, Typography, Card, message, Divider } from 'antd';
 import type { UploadFile } from 'antd/es/upload/interface';
@@ -6,6 +7,7 @@ import InputPanel from './components/InputPanel';
 import ControlPanel from './components/ControlPanel';
 import ResultBoard, { TestPayload } from './components/ResultBoard';
 import { STORAGE_KEYS, DEFAULT_VALUES, CompressionAlgorithm } from '@/common';
+import { zhCN } from '@/locales/zh-CN';
 
 const { Header, Content } = Layout;
 const { Title } = Typography;
@@ -16,7 +18,7 @@ const App: React.FC = () => {
   const [fileList, setFileList] = useState<UploadFile[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
 
-  // 用于触发测试并传递给 ResultBoard
+  // Trigger test and pass to ResultBoard
   const [testPayload, setTestPayload] = useState<TestPayload | null>(null);
   
   // Initialize state from local storage if available
@@ -80,25 +82,25 @@ const App: React.FC = () => {
   const handleGenerateRandomText = () => {
     const text = generateRandomText({ length: randomLength, randomness });
     setTextInput(text);
-    message.success(`已生成 ${text.length} 字符的随机文本 (随机度: ${randomness})`);
+    message.success(`${zhCN.generatedRandomText} ${text.length} ${zhCN.charsRandomText} ${randomness})`);
   };
 
   const processData = async (data: Uint8Array) => {
     if (algorithms.length === 0) {
-      message.warning('请至少选择一种压缩算法');
+      message.warning(zhCN.selectAtLeastOneAlgorithm);
       return;
     }
     
     if (executionCount < 1) {
-      message.warning('执行次数必须大于等于1');
+      message.warning(zhCN.executionCountMin1);
       return;
     }
     
-    // 给 loading 稍微一点反应时间，防止被单线程同步逻辑卡住
+    // Give loading a little time to react to prevent being stuck by single-threaded synchronous logic
     setLoading(true);
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    // 将数据下发给 ResultBoard，ResultBoard 内的每个卡片会独立响应 triggerId 的变化并执行计算
+    // Pass data to ResultBoard, each card in ResultBoard will independently respond to the change of triggerId and execute calculation
     setTestPayload({
       data,
       executionCount,
@@ -106,13 +108,13 @@ const App: React.FC = () => {
       collectLogs
     });
     
-    message.success(`已下发执行任务 (循环 ${executionCount} 次)`);
+    message.success(`${zhCN.taskDispatched} ${executionCount} ${zhCN.taskDispatchedTimes}`);
   };
 
   const handleRunTest = async () => {
     if (activeTab === 'text') {
       if (!textInput) {
-        message.warning('请输入或生成文本');
+        message.warning(zhCN.pleaseInputOrGenerateText);
         return;
       }
       setOriginalFileName('text_data.txt');
@@ -121,7 +123,7 @@ const App: React.FC = () => {
       await processData(data);
     } else {
       if (fileList.length === 0 || !fileList[0].originFileObj) {
-        message.warning('请先上传文件');
+        message.warning(zhCN.pleaseUploadFileFirst);
         return;
       }
       const file = fileList[0].originFileObj;
@@ -135,7 +137,7 @@ const App: React.FC = () => {
         }
       };
       reader.onerror = () => {
-        message.error('读取文件失败');
+        message.error(zhCN.failedToReadFile);
       };
       reader.readAsArrayBuffer(file);
     }
@@ -148,7 +150,7 @@ const App: React.FC = () => {
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
       <Header style={{ background: '#fff', padding: '0 20px', display: 'flex', alignItems: 'center', boxShadow: '0 2px 8px #f0f1f2' }}>
-        <Title level={3} style={{ margin: 0 }}>压缩与解压性能测试工具</Title>
+        <Title level={3} style={{ margin: 0 }}>{zhCN.appTitle}</Title>
       </Header>
       <Content style={{ padding: '24px 50px', maxWidth: 1200, margin: '0 auto', width: '100%' }}>
         <Card variant="borderless" style={{ borderRadius: 8, boxShadow: '0 2px 8px rgba(0,0,0,0.05)' }}>

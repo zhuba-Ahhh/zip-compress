@@ -3,12 +3,13 @@ import { Tabs, Input, Button, Upload, Space, InputNumber, Slider, Typography, Ro
 import { FileTextOutlined, UploadOutlined, CodeOutlined } from '@ant-design/icons';
 import type { UploadFile } from 'antd/es/upload/interface';
 import { MAX_FILE_SIZE_HINT } from '@/common';
+import { zhCN } from '@/locales/zh-CN';
 
 const { TextArea } = Input;
 const { Text } = Typography;
 
 // ==========================================
-// 1. 文本处理面板 (Memoized)
+// 1. Text Input Tab (Memoized)
 // ==========================================
 interface TextInputTabProps {
   textInput: string;
@@ -48,19 +49,15 @@ const TextInputTab = memo<TextInputTabProps>(({
     <div style={{ marginTop: 16 }}>
       <Row gutter={16} align="middle" style={{ marginBottom: 16 }}>
         <Col>
-          <Button type="dashed" icon={<CodeOutlined />} onClick={onGenerateRandomText}>
-            生成随机长文本
-          </Button>
+          <Button type="dashed" icon={<CodeOutlined />} onClick={onGenerateRandomText}>{zhCN.generateRandomText}</Button>
         </Col>
         <Col>
-          <Button danger onClick={handleClear}>
-            清空
-          </Button>
+          <Button danger onClick={handleClear}>{zhCN.clear}</Button>
         </Col>
         <Col flex="auto">
           <Space style={{ float: 'right' }}>
             <Space>
-              <Text type="secondary">文本长度:</Text>
+              <Text type="secondary">{zhCN.textLength}</Text>
               <InputNumber
                 min={10}
                 max={10000000}
@@ -71,7 +68,7 @@ const TextInputTab = memo<TextInputTabProps>(({
               />
             </Space>
             <Space style={{ marginLeft: 16 }}>
-              <Text type="secondary">随机度 (0-1):</Text>
+              <Text type="secondary">{zhCN.randomness}</Text>
               <Slider
                 min={0}
                 max={1}
@@ -87,7 +84,7 @@ const TextInputTab = memo<TextInputTabProps>(({
       </Row>
       <TextArea
         rows={10}
-        placeholder="请输入长文本，或点击上方按钮生成随机文本"
+        placeholder={zhCN.textInputPlaceholder}
         value={textInput}
         onChange={handleTextChange}
         style={{ fontFamily: 'monospace' }}
@@ -97,7 +94,7 @@ const TextInputTab = memo<TextInputTabProps>(({
 });
 
 // ==========================================
-// 2. 文件处理面板 (Memoized)
+// 2. File Input Tab (Memoized)
 // ==========================================
 interface FileInputTabProps {
   fileList: UploadFile[];
@@ -130,15 +127,15 @@ const FileInputTab = memo<FileInputTabProps>(({
         <p className="ant-upload-drag-icon">
           <UploadOutlined />
         </p>
-        <p className="ant-upload-text">点击或拖拽文件到此区域上传</p>
-        <p className="ant-upload-hint">支持任意类型的文件进行压缩测试，由于是在浏览器内存中处理，建议文件不要超过 {MAX_FILE_SIZE_HINT}</p>
+        <p className="ant-upload-text">{zhCN.clickOrDragUpload}</p>
+        <p className="ant-upload-hint">{zhCN.uploadHintPrefix}{MAX_FILE_SIZE_HINT}</p>
       </Upload.Dragger>
     </div>
   );
 });
 
 // ==========================================
-// 3. 主面板组件
+// 3. Main Panel Component
 // ==========================================
 interface InputPanelProps {
   activeTab: string;
@@ -176,7 +173,7 @@ const InputPanel: React.FC<InputPanelProps> = ({
       items={[
         {
           key: 'text',
-          label: <span><FileTextOutlined /> 文本处理</span>,
+          label: <span><FileTextOutlined /> {zhCN.textProcessing}</span>,
           children: (
             <TextInputTab
               textInput={textInput}
@@ -192,7 +189,7 @@ const InputPanel: React.FC<InputPanelProps> = ({
         },
         {
           key: 'file',
-          label: <span><UploadOutlined /> 文件处理</span>,
+          label: <span><UploadOutlined /> {zhCN.fileProcessing}</span>,
           children: (
             <FileInputTab
               fileList={fileList}
