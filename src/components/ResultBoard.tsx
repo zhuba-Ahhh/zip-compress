@@ -187,7 +187,7 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
       ) : (
             <Descriptions column={2} size="small">
               <Descriptions.Item label="算法" span={2}>
-                <Text strong>{algorithmName?.description || stats.algorithm}</Text>
+                <Text strong ellipsis={{ tooltip: algorithmName?.description || '' }}>{algorithmName?.description || stats.algorithm}</Text>
               </Descriptions.Item>
           <Descriptions.Item label="原始大小">
             <Text strong>{formatSize(stats.originalSize)}</Text> ({stats.originalSize} B)
