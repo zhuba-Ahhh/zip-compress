@@ -58,11 +58,12 @@ export function decodeBitpack(buffer: Uint8Array, logs?: CompressionLog[]): Uint
   if (logs) logs.push({ 
     timestamp: performance.now(), 
     phase: '解压完成', 
+    level: 'info',
     message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}`,
     details: {
-      matchCount,
-      literalCount,
-      decompressedSize: output.length
+      decodedMatches: matchCount,
+      decodedLiterals: literalCount,
+      bytesWritten: output.length
     }
   });
   return output.getArray();
@@ -79,10 +80,20 @@ export function decodeHuffmanDynamic(buffer: Uint8Array, logs?: CompressionLog[]
   if (logs) logs.push({ timestamp: performance.now(), phase: '初始化', message: '开始动态 Huffman 解码' });
 
   // 1. 读取 Huffman 树
-  const root = readHuffmanTreeDynamic(reader);
+  const stats = { nodesCount: 0, leavesCount: 0 };
+  const root = readHuffmanTreeDynamic(reader, stats);
   if (!root) return new Uint8Array(0);
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'Huffman重建', message: '动态 Huffman 树读取成功' });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: 'Huffman重建', 
+    level: 'debug',
+    message: '动态 Huffman 树读取成功',
+    details: {
+      restoredUniqueSymbols: stats.leavesCount,
+      totalNodes: stats.nodesCount
+    }
+  });
 
   const output = new DynamicUint8Array();
 
@@ -131,11 +142,12 @@ export function decodeHuffmanDynamic(buffer: Uint8Array, logs?: CompressionLog[]
   if (logs) logs.push({ 
     timestamp: performance.now(), 
     phase: '解压完成', 
+    level: 'info',
     message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}`,
     details: {
-      matchCount,
-      literalCount,
-      decompressedSize: output.length
+      decodedMatches: matchCount,
+      decodedLiterals: literalCount,
+      bytesWritten: output.length
     }
   });
   return output.getArray();
@@ -150,12 +162,24 @@ export function decodeHuffmanDeflate(buffer: Uint8Array, logs?: CompressionLog[]
 
   if (logs) logs.push({ timestamp: performance.now(), phase: '初始化', message: '开始 Deflate Huffman 解码' });
 
-  const llRoot = deserializeTreeDeflate(reader, 9);
-  const distRoot = deserializeTreeDeflate(reader, 5);
+  const llStats = { nodesCount: 0, leavesCount: 0 };
+  const distStats = { nodesCount: 0, leavesCount: 0 };
+  const llRoot = deserializeTreeDeflate(reader, 9, llStats);
+  const distRoot = deserializeTreeDeflate(reader, 5, distStats);
 
   if (!llRoot || !distRoot) return new Uint8Array(0);
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'Huffman重建', message: 'Deflate 双哈夫曼树读取成功' });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: 'Huffman重建', 
+    level: 'debug',
+    message: 'Deflate 双哈夫曼树读取成功',
+    details: {
+      restoredUniqueSymbols: llStats.leavesCount + distStats.leavesCount,
+      llTreeLeaves: llStats.leavesCount,
+      distTreeLeaves: distStats.leavesCount
+    }
+  });
 
   function readSymbol(root: HuffmanNodeDeflate): number | null {
     let node = root;
@@ -215,11 +239,12 @@ export function decodeHuffmanDeflate(buffer: Uint8Array, logs?: CompressionLog[]
   if (logs) logs.push({ 
     timestamp: performance.now(), 
     phase: '解压完成', 
+    level: 'info',
     message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}`,
     details: {
-      matchCount,
-      literalCount,
-      decompressedSize: output.length
+      decodedMatches: matchCount,
+      decodedLiterals: literalCount,
+      bytesWritten: output.length
     }
   });
   return output.getArray();

@@ -30,6 +30,7 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
   let literalCount = 0;
   let totalMatchLen = 0;
   let maxMatchLen = 0;
+  const hashCollisions = 0; // 仅为统一日志格式，暴力匹配无碰撞
 
   while (cursor < buffer.length) {
     let bestMatchLen = 0;
@@ -86,12 +87,16 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
   if (logs) logs.push({ 
     timestamp: performance.now(), 
     phase: 'LZ77完成', 
+    level: 'info',
     message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`,
     details: {
-      totalMatchLen,
-      maxMatchLen,
+      totalTokens: tokens.length,
+      literals: literalCount,
+      matches: matchCount,
+      longestMatchLen: maxMatchLen,
       avgMatchLen: matchCount > 0 ? (totalMatchLen / matchCount).toFixed(2) : 0,
-      compressionRatio: `${((matchCount * 2 + literalCount) / buffer.length * 100).toFixed(2)}% (预估 Token 占比)`
+      hashCollisions,
+      compressionRatioLZ77: `${((tokens.length / buffer.length) * 100).toFixed(2)}%`
     }
   });
   return tokens;
@@ -115,10 +120,12 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
   let literalCount = 0;
   let totalMatchLen = 0;
   let maxMatchLen = 0;
+  let hashCollisions = 0;
 
   const insertString = (pos: number) => {
     if (pos <= len - MIN_MATCH_LENGTH) {
       currentHash = ((buffer[pos] << (HASH_SHIFT * 2)) ^ (buffer[pos + 1] << HASH_SHIFT) ^ buffer[pos + 2]) & HASH_MASK;
+      if (head[currentHash] !== -1) hashCollisions++;
       prev[pos] = head[currentHash];
       head[currentHash] = pos;
     }
@@ -192,12 +199,16 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
   if (logs) logs.push({ 
     timestamp: performance.now(), 
     phase: 'LZ77完成', 
+    level: 'info',
     message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`,
     details: {
-      totalMatchLen,
-      maxMatchLen,
+      totalTokens: tokens.length,
+      literals: literalCount,
+      matches: matchCount,
+      longestMatchLen: maxMatchLen,
       avgMatchLen: matchCount > 0 ? (totalMatchLen / matchCount).toFixed(2) : 0,
-      compressionRatio: `${((matchCount * 2 + literalCount) / buffer.length * 100).toFixed(2)}% (预估 Token 占比)`
+      hashCollisions,
+      compressionRatioLZ77: `${((tokens.length / buffer.length) * 100).toFixed(2)}%`
     }
   });
   return tokens;
@@ -223,6 +234,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
   let literalCount = 0;
   let totalMatchLen = 0;
   let maxMatchLen = 0;
+  let hashCollisions = 0;
 
   while (cursor < buffer.length) {
     let bestMatchLen = 0;
@@ -234,6 +246,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
       const hash = getHash(cursor);
       let matchIdx = head[hash];
 
+      if (matchIdx !== -1) hashCollisions++;
       prev[cursor % (WINDOW_SIZE + 1)] = matchIdx;
       head[hash] = cursor;
 
@@ -283,6 +296,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
         cursor++;
         if (cursor + MIN_MATCH_LENGTH <= buffer.length) {
           const hash = getHash(cursor);
+          if (head[hash] !== -1) hashCollisions++;
           prev[cursor % (WINDOW_SIZE + 1)] = head[hash];
           head[hash] = cursor;
         }
@@ -301,12 +315,16 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
   if (logs) logs.push({ 
     timestamp: performance.now(), 
     phase: 'LZ77完成', 
+    level: 'info',
     message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`,
     details: {
-      totalMatchLen,
-      maxMatchLen,
+      totalTokens: tokens.length,
+      literals: literalCount,
+      matches: matchCount,
+      longestMatchLen: maxMatchLen,
       avgMatchLen: matchCount > 0 ? (totalMatchLen / matchCount).toFixed(2) : 0,
-      compressionRatio: `${((matchCount * 2 + literalCount) / buffer.length * 100).toFixed(2)}% (预估 Token 占比)`
+      hashCollisions,
+      compressionRatioLZ77: `${((tokens.length / buffer.length) * 100).toFixed(2)}%`
     }
   });
   return tokens;

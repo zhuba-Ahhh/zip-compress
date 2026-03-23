@@ -8,7 +8,7 @@
  * 4. Elias Gamma 编码：用于高效存储无上界的正整数（如距离、长度、频率等）。
  */
 
-import { PhaseTiming } from '../../../types';
+import { PhaseTiming, CompressionLog } from '../../../types';
 
 /**
  * 位写入器 (BitWriter)
@@ -121,11 +121,19 @@ class HuffmanNode {
   }
 }
 
-export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false): { data: Uint8Array; phases?: PhaseTiming[] } {
+export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false): { data: Uint8Array; phases?: PhaseTiming[], logs?: CompressionLog[] } {
   const len = buffer.length;
   if (len === 0) return { data: new Uint8Array(0) };
 
   const phases: PhaseTiming[] = [];
+  const logs: CompressionLog[] = [];
+  
+  const addLog = (phase: string, message: string, level: 'info' | 'debug' | 'warn' | 'error' = 'info', details?: any) => {
+    if (collectLogs) {
+      logs.push({ timestamp: performance.now(), phase, message, level, details });
+    }
+  };
+
   const trackPhase = (name: string, fn: () => void) => {
     const start = performance.now();
     fn();
@@ -135,6 +143,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   let writer: BitWriter;
   
   trackPhase("初始化", () => {
+    addLog('初始化', `准备压缩数据, 原始大小: ${len} bytes`, 'info');
     writer = new BitWriter(Math.max(len, 1024));
     // 头部写入原始数据长度，解压时用于确定结束边界
     writer.writeBits(len, 32);
@@ -153,9 +162,15 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   
   trackPhase("LZ77匹配(Pass 1)", () => {
     let currentHash = 0;
+    let hashCollisions = 0;
+    let totalMatchLengths = 0;
+
     const insertString = (pos: number) => {
       if (pos <= len - MIN_MATCH_LENGTH) {
         currentHash = ((buffer[pos] << (HASH_SHIFT * 2)) ^ (buffer[pos + 1] << HASH_SHIFT) ^ buffer[pos + 2]) & HASH_MASK;
+        if (head[currentHash] !== -1) {
+          hashCollisions++;
+        }
         prev[pos] = head[currentHash];
         head[currentHash] = pos;
       }
@@ -166,6 +181,10 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
     }
 
     let cursor = 0;
+    let matchCount = 0;
+    let literalCount = 0;
+    let longestMatch = 0;
+
     const findMatch = (pos: number) => {
       let matchHead = prev[pos];
       const limit = Math.max(0, pos - WINDOW_SIZE); // 最远追溯到窗口边界
@@ -209,6 +228,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
         if (nextMatch.len > match.len && nextMatch.len >= MIN_MATCH_LENGTH) {
           tokens.push(buffer[cursor]);
           freqs[buffer[cursor]]++;
+          literalCount++;
           cursor++;
           continue;
         }
@@ -216,6 +236,9 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
 
       if (match.len >= MIN_MATCH_LENGTH && match.dist > 0 && match.dist <= WINDOW_SIZE) {
         tokens.push(-((match.dist << 12) | match.len)); 
+        matchCount++;
+        longestMatch = Math.max(longestMatch, match.len);
+        totalMatchLengths += match.len;
         for (let i = 1; i < match.len; i++) {
           cursor++;
           insertString(cursor);
@@ -224,9 +247,20 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
       } else {
         tokens.push(buffer[cursor]);
         freqs[buffer[cursor]]++;
+        literalCount++;
         cursor++;
       }
     }
+    
+    addLog('LZ77匹配(Pass 1)', `完成字符串匹配分析`, 'info', {
+      totalTokens: tokens.length,
+      literals: literalCount,
+      matches: matchCount,
+      longestMatchLen: longestMatch,
+      avgMatchLen: matchCount > 0 ? (totalMatchLengths / matchCount).toFixed(2) : 0,
+      hashCollisions,
+      compressionRatioLZ77: ((tokens.length / len) * 100).toFixed(2) + '%'
+    });
   });
 
   const huffmanCodes: { [key: number]: { code: number, len: number } } = {};
@@ -234,16 +268,21 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   trackPhase("构建Huffman树", () => {
     // === 构建 Huffman 树用于 Literal 压缩 ===
     const nodes: HuffmanNode[] = [];
+    let uniqueSymbols = 0;
+    
     for (let i = 0; i < 256; i++) {
       if (freqs[i] > 0) {
         nodes.push(new HuffmanNode(i, freqs[i]));
+        uniqueSymbols++;
       }
     }
 
     if (nodes.length === 0) {
       nodes.push(new HuffmanNode(0, 1));
+      uniqueSymbols = 1;
     }
 
+    // 优先队列 (此处用 sort 模拟) 合并节点构建树
     while (nodes.length > 1) {
       nodes.sort((a, b) => b.freq - a.freq);
       const right = nodes.pop()!;
@@ -255,16 +294,45 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
     }
     const root = nodes[0];
 
+    let maxDepth = 0;
+    let sumDepth = 0;
+    let leafCount = 0;
+
     const buildCodes = (node: HuffmanNode | null, code: number, length: number) => {
       if (!node) return;
       if (node.value !== null) {
         huffmanCodes[node.value] = { code, len: length };
+        maxDepth = Math.max(maxDepth, length);
+        sumDepth += length * node.freq;
+        leafCount += node.freq;
         return;
       }
       buildCodes(node.left, (code << 1) | 0, length + 1);
       buildCodes(node.right, (code << 1) | 1, length + 1);
     };
     buildCodes(root, 0, 0);
+
+    const avgCodeLen = leafCount > 0 ? (sumDepth / leafCount).toFixed(2) : 0;
+
+    // 提取出现频率最高的几个字符，用于日志展示
+    const topSymbols = Array.from(freqs)
+      .map((f, i) => ({ symbol: i, freq: f }))
+      .filter(x => x.freq > 0)
+      .sort((a, b) => b.freq - a.freq)
+      .slice(0, 5)
+      .map(x => ({
+        symbol: String.fromCharCode(x.symbol) || `0x${x.symbol.toString(16)}`,
+        freq: x.freq,
+        codeStr: huffmanCodes[x.symbol].code.toString(2).padStart(huffmanCodes[x.symbol].len, '0'),
+        bitLength: huffmanCodes[x.symbol].len
+      }));
+
+    addLog('构建Huffman树', `基于字面量特征动态构建编码树完成`, 'info', {
+      uniqueSymbolsFound: uniqueSymbols,
+      maxTreeDepth: maxDepth,
+      avgCodeLength: avgCodeLen,
+      topSymbols
+    });
   });
 
   trackPhase("位流编码与输出(Pass 2)", () => {
@@ -273,12 +341,16 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
       writer!.writeGamma(freqs[i] + 1);
     }
 
+    let encodedLiterals = 0;
+    let encodedMatches = 0;
+
     // === 第二遍扫描 (Pass 2)：将 token 实际写入 bit stream ===
     for (const token of tokens) {
       if (token >= 0) {
         writer!.writeBit(0);
         const huff = huffmanCodes[token];
         writer!.writeBits(huff.code, huff.len);
+        encodedLiterals++;
       } else {
         const val = -token;
         const dist = val >> 12;
@@ -286,11 +358,25 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
         writer!.writeBit(1);
         writer!.writeGamma(dist);
         writer!.writeGamma(matchLen - MIN_MATCH_LENGTH + 1);
+        encodedMatches++;
       }
     }
+    
+    addLog('位流编码', `二进制位流封装完毕`, 'debug', {
+      encodedLiterals,
+      encodedMatches,
+      treeHeaderSize: `约 ${256 * 2} bits` // 粗略估算
+    });
   });
 
-  return { data: writer!.flush(), phases };
+  const finalData = writer!.flush();
+  addLog('压缩完成', `压缩总大小: ${finalData.length} bytes (比率: ${((finalData.length / len) * 100).toFixed(2)}%)`, 'info', {
+    originalBytes: len,
+    compressedBytes: finalData.length,
+    savedBytes: len - finalData.length
+  });
+
+  return { data: finalData, phases, logs };
 }
 
 /**
@@ -369,10 +455,18 @@ class BitReader {
   }
 }
 
-export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false): { data: Uint8Array; phases?: PhaseTiming[] } {
+export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false): { data: Uint8Array; phases?: PhaseTiming[], logs?: CompressionLog[] } {
   const reader = new BitReader(buffer);
   
   const phases: PhaseTiming[] = [];
+  const logs: CompressionLog[] = [];
+  
+  const addLog = (phase: string, message: string, level: 'info' | 'debug' | 'warn' | 'error' = 'info', details?: any) => {
+    if (collectLogs) {
+      logs.push({ timestamp: performance.now(), phase, message, level, details });
+    }
+  };
+
   const trackPhase = (name: string, fn: () => void) => {
     const start = performance.now();
     fn();
@@ -387,6 +481,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
   });
 
   if (expectedLength === 0) return { data: new Uint8Array(0) };
+  addLog('初始化', `解析出目标解压大小: ${expectedLength} bytes`, 'info');
 
   let root: HuffmanNode | null = null;
 
@@ -394,6 +489,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
     // === 2. 反序列化并重建 Huffman 树 ===
     const freqs = new Int32Array(256);
     const nodes: HuffmanNode[] = [];
+    let uniqueSymbols = 0;
 
     for (let i = 0; i < 256; i++) {
       const freq = reader.readGamma();
@@ -401,6 +497,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
       freqs[i] = freq - 1; // 减去序列化时加的 1
       if (freqs[i] > 0) {
         nodes.push(new HuffmanNode(i, freqs[i]));
+        uniqueSymbols++;
       }
     }
 
@@ -419,6 +516,10 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
       nodes.push(parent);
     }
     root = nodes[0];
+    
+    addLog('重建Huffman树', `解析头部频率并还原字典树成功`, 'debug', {
+      restoredUniqueSymbols: uniqueSymbols
+    });
   });
 
   const output = new Uint8Array(expectedLength);
@@ -426,6 +527,8 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
   trackPhase("位流解码输出", () => {
     let outPos = 0;
     const MIN_MATCH_LENGTH = 3;
+    let decodedLiterals = 0;
+    let decodedMatches = 0;
 
     // === 3. 逐步解码数据流 ===
     while (outPos < expectedLength) {
@@ -445,6 +548,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
 
         if (!curr || curr.value === null) break;
         output[outPos++] = curr.value;
+        decodedLiterals++;
       } else {
         // Match (匹配)：解码 distance 和 length
         const distance = reader.readGamma();
@@ -463,6 +567,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
         const startIdx = outPos - distance;
 
         if (startIdx < 0) {
+          addLog('位流解码', `发现非法的回退距离 ${distance}`, 'error', { currentPos: outPos });
           break; // 防御性检查：避免越界
         }
 
@@ -472,9 +577,17 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
         for (let i = 0; i < copyLen; i++) {
           output[outPos++] = output[startIdx + i];
         }
+        decodedMatches++;
       }
     }
+    
+    addLog('位流解码', `解码循环结束`, 'debug', {
+      decodedLiterals,
+      decodedMatches,
+      bytesWritten: outPos
+    });
   });
 
-  return { data: output, phases };
+  addLog('解压完成', `成功还原数据: ${output.length} bytes`, 'info');
+  return { data: output, phases, logs };
 }

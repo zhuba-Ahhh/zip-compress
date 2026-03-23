@@ -43,6 +43,7 @@ const PHASE_COLORS = ['#bae0ff', '#91caff', '#69b1ff', '#4096ff', '#1677ff', '#0
 const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
   const [showRadar, setShowRadar] = React.useState(true);
   const [showPhases, setShowPhases] = React.useState(true);
+  const [showDecompressPhases, setShowDecompressPhases] = React.useState(true);
 
   // Normalize data for Radar Chart to make them comparable (0-100 score)
   const radarData = useMemo(() => {
@@ -81,23 +82,74 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
     const hasPhases = data.some(d => d.compressPhases && d.compressPhases.length > 0);
     if (!hasPhases) return null;
 
-    // 收集所有出现过的阶段名称，保证堆叠图的 keys 完整
-    const allPhaseNames = new Set<string>();
+    // 收集所有出现过的阶段名称，保证堆叠图的 keys 完整，并保持固定的顺序
+    const predefinedOrder = [
+      "初始化",
+      "LZ77匹配(Pass 1)",
+      "构建Huffman树",
+      "构建树与编码",
+      "位流编码与输出(Pass 2)",
+      "位流封装"
+    ];
+    const dynamicPhases = new Set<string>();
 
     const chartData = data.map(d => {
       const row: any = { name: d.name };
       if (d.compressPhases) {
         d.compressPhases.forEach(p => {
           row[p.name] = Number(p.duration.toFixed(2));
-          allPhaseNames.add(p.name);
+          if (!predefinedOrder.includes(p.name)) {
+            dynamicPhases.add(p.name);
+          }
         });
       }
       return row;
     });
 
+    const allPhaseNames = [...predefinedOrder, ...Array.from(dynamicPhases)].filter(name =>
+      chartData.some(row => row[name] !== undefined)
+    );
+
     return {
       data: chartData,
-      keys: Array.from(allPhaseNames)
+      keys: allPhaseNames
+    };
+  }, [data]);
+
+  // 准备解压阶段耗时数据
+  const decompressPhasesData = useMemo(() => {
+    const hasPhases = data.some(d => d.decompressPhases && d.decompressPhases.length > 0);
+    if (!hasPhases) return null;
+
+    const predefinedOrder = [
+      "初始化",
+      "Huffman重建",
+      "位流解码输出",
+      "解码",
+      "解压完成"
+    ];
+    const dynamicPhases = new Set<string>();
+
+    const chartData = data.map(d => {
+      const row: any = { name: d.name };
+      if (d.decompressPhases) {
+        d.decompressPhases.forEach(p => {
+          row[p.name] = Number(p.duration.toFixed(2));
+          if (!predefinedOrder.includes(p.name)) {
+            dynamicPhases.add(p.name);
+          }
+        });
+      }
+      return row;
+    });
+
+    const allPhaseNames = [...predefinedOrder, ...Array.from(dynamicPhases)].filter(name =>
+      chartData.some(row => row[name] !== undefined)
+    );
+
+    return {
+      data: chartData,
+      keys: allPhaseNames
     };
   }, [data]);
 
@@ -116,8 +168,14 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
             </div>
             {phasesData && (
               <div>
-                <Text style={{ fontSize: 14, fontWeight: 'normal', marginRight: 8 }}>显示生命周期拆解:</Text>
+                <Text style={{ fontSize: 14, fontWeight: 'normal', marginRight: 8 }}>压缩阶段:</Text>
                 <Switch checked={showPhases} onChange={setShowPhases} size="small" />
+              </div>
+            )}
+            {decompressPhasesData && (
+              <div>
+                <Text style={{ fontSize: 14, fontWeight: 'normal', marginRight: 8 }}>解压阶段:</Text>
+                <Switch checked={showDecompressPhases} onChange={setShowDecompressPhases} size="small" />
               </div>
             )}
           </div>
@@ -159,7 +217,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
           <Col xs={24}>
             <div style={{ textAlign: 'center', marginBottom: 8 }}>
               <Title level={5} style={{ margin: 0 }}>🧬 压缩生命周期耗时拆解 (ms)</Title>
-              <Text type="secondary" style={{ fontSize: 12 }}>展示算法内部各个步骤的具体耗时分布</Text>
+              <Text type="secondary" style={{ fontSize: 12 }}>展示压缩算法内部各个步骤的具体耗时分布</Text>
             </div>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={phasesData.data} margin={{ top: 20, right: 30, left: 20, bottom: 25 }} layout="vertical">
@@ -170,6 +228,29 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
                 <Legend />
                 {phasesData.keys.map((key, index) => (
                   <Bar key={key} dataKey={key} stackId="a" fill={PHASE_COLORS[index % PHASE_COLORS.length]} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </Col>
+        </Row>
+      )}
+
+      {showDecompressPhases && decompressPhasesData && (
+        <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
+          <Col xs={24}>
+            <div style={{ textAlign: 'center', marginBottom: 8 }}>
+              <Title level={5} style={{ margin: 0 }}>🔓 解压生命周期耗时拆解 (ms)</Title>
+              <Text type="secondary" style={{ fontSize: 12 }}>展示解压算法内部各个步骤的具体耗时分布</Text>
+            </div>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={decompressPhasesData.data} margin={{ top: 20, right: 30, left: 20, bottom: 25 }} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={true} />
+                <XAxis type="number" />
+                <YAxis dataKey="name" type="category" width={100} />
+                <RechartsTooltip cursor={{ fill: '#f0f0f0' }} />
+                <Legend />
+                {decompressPhasesData.keys.map((key, index) => (
+                  <Bar key={key} dataKey={key} stackId="a" fill={PHASE_COLORS[(index + 4) % PHASE_COLORS.length]} />
                 ))}
               </BarChart>
             </ResponsiveContainer>

@@ -40,12 +40,13 @@ export function encodeBitpack(tokens: Token[], logs?: CompressionLog[]): Uint8Ar
   if (logs) logs.push({ 
     timestamp: performance.now(), 
     phase: '编码完成', 
+    level: 'info',
     message: `编码大小: ${res.length} 字节`,
     details: {
-      literalCount,
-      matchCount,
-      estimatedBits: literalCount * 9 + matchCount * 21 + 21,
-      actualBytes: res.length
+      encodedLiterals: literalCount,
+      encodedMatches: matchCount,
+      compressedBytes: res.length,
+      estimatedBits: literalCount * 9 + matchCount * 21 + 21
     }
   });
   return res;
@@ -103,6 +104,19 @@ export function encodeHuffmanDynamic(tokens: Token[], logs?: CompressionLog[]): 
   };
   buildCodes(root, 0, 0);
 
+  let maxTreeDepth = 0;
+  let totalBits = 0;
+  let totalFreq = 0;
+  let uniqueSymbolsFound = 0;
+  for (const key in codes) {
+    uniqueSymbolsFound++;
+    const len = codes[key].len;
+    if (len > maxTreeDepth) maxTreeDepth = len;
+    totalBits += len * freqs[parseInt(key)];
+    totalFreq += freqs[parseInt(key)];
+  }
+  const avgCodeLength = totalFreq > 0 ? (totalBits / totalFreq).toFixed(2) : 0;
+
   if (logs) {
     const sortedSymbols = Object.entries(codes)
       .map(([sym, huff]) => ({
@@ -117,27 +131,38 @@ export function encodeHuffmanDynamic(tokens: Token[], logs?: CompressionLog[]): 
     logs.push({ 
       timestamp: performance.now(), 
       phase: 'Huffman建树', 
+      level: 'info',
       message: '动态 Huffman 树构建成功',
-      details: { topSymbols: sortedSymbols }
+      details: { 
+        uniqueSymbolsFound,
+        maxTreeDepth,
+        avgCodeLength,
+        topSymbols: sortedSymbols 
+      }
     });
   }
 
   const writer = new BitWriter();
 
   // 4. 将 Huffman 树写入流
-  writeHuffmanTreeDynamic(root, writer);
+  const treeHeaderSize = writeHuffmanTreeDynamic(root, writer);
 
   // 5. 写入压缩数据
+  let encodedLiterals = 0;
+  let encodedMatches = 0;
+
   for (const token of tokens) {
     if (token.type === 'literal') {
       const huff = codes[token.value];
       writer.writeBits(huff.code, huff.len);
+      encodedLiterals++;
     } else {
       const symbol = 257 + token.length - MIN_MATCH_LENGTH;
       const huff = codes[symbol];
       writer.writeBits(huff.code, huff.len);
       // Distance 依然用 12 bits 固定长度
       writer.writeBits(token.distance, 12);
+      encodedMatches++;
     }
   }
 
@@ -146,7 +171,18 @@ export function encodeHuffmanDynamic(tokens: Token[], logs?: CompressionLog[]): 
   writer.writeBits(eofHuff.code, eofHuff.len);
 
   const res = writer.flush();
-  if (logs) logs.push({ timestamp: performance.now(), phase: '编码完成', message: `编码大小: ${res.length} 字节` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: '编码完成', 
+    level: 'info',
+    message: `编码大小: ${res.length} 字节`,
+    details: {
+      encodedLiterals,
+      encodedMatches,
+      treeHeaderSize: `${treeHeaderSize} bits`,
+      compressedBytes: res.length
+    }
+  });
   return res;
 }
 
@@ -174,26 +210,67 @@ export function encodeHuffmanDeflate(tokens: Token[], logs?: CompressionLog[]): 
     }
   }
 
-  const llTree = buildHuffmanTreeDeflate(llFreq);
-  const distTree = buildHuffmanTreeDeflate(distFreq);
+  const llTree = buildHuffmanTreeDeflate(llFreq, logs);
+  const distTree = buildHuffmanTreeDeflate(distFreq, logs);
 
-  if (logs) logs.push({ 
-    timestamp: performance.now(), 
-    phase: 'Huffman重建', 
-    message: '动态 Huffman 树构建成功',
-    details: {
-      llTreeLeaves: llFreq.filter(f => f > 0).length,
-      distTreeLeaves: distFreq.filter(f => f > 0).length
-    }
-  });
+  // Calculate stats for logs
+  let llMaxDepth = 0;
+  let distMaxDepth = 0;
+  let llTotalBits = 0;
+  let llTotalFreq = 0;
+  let uniqueSymbolsFound = 0;
+  
+  for (const [sym, info] of llTree.codes.entries()) {
+    uniqueSymbolsFound++;
+    if (info.bitLen > llMaxDepth) llMaxDepth = info.bitLen;
+    llTotalBits += info.bitLen * llFreq[sym];
+    llTotalFreq += llFreq[sym];
+  }
+  for (const [, info] of distTree.codes.entries()) {
+    if (info.bitLen > distMaxDepth) distMaxDepth = info.bitLen;
+  }
+  const avgCodeLength = llTotalFreq > 0 ? (llTotalBits / llTotalFreq).toFixed(2) : 0;
 
-  serializeTreeDeflate(llTree.root, writer, 9); // Max LL symbol 285 (9 bits)
-  serializeTreeDeflate(distTree.root, writer, 5); // Max Dist symbol 29 (5 bits)
+  if (logs) {
+    const sortedSymbols = Array.from(llTree.codes.entries())
+      .map(([sym, info]) => ({
+        symbol: sym < 256 ? String.fromCharCode(sym) : (sym === 256 ? 'EOF' : `LEN_${sym}`),
+        freq: llFreq[sym],
+        codeStr: info.code.toString(2).padStart(info.bitLen, '0'),
+        bitLength: info.bitLen
+      }))
+      .filter(x => x.freq > 0)
+      .sort((a, b) => b.freq - a.freq)
+      .slice(0, 10);
+
+    logs.push({ 
+      timestamp: performance.now(), 
+      phase: 'Huffman重建', 
+      level: 'info',
+      message: '动态 Huffman 树构建成功',
+      details: {
+        uniqueSymbolsFound,
+        maxTreeDepth: Math.max(llMaxDepth, distMaxDepth),
+        avgCodeLength,
+        llTreeLeaves: llFreq.filter(f => f > 0).length,
+        distTreeLeaves: distFreq.filter(f => f > 0).length,
+        topSymbols: sortedSymbols
+      }
+    });
+  }
+
+  const llTreeHeaderSize = serializeTreeDeflate(llTree.root, writer, 9); // Max LL symbol 285 (9 bits)
+  const distTreeHeaderSize = serializeTreeDeflate(distTree.root, writer, 5); // Max Dist symbol 29 (5 bits)
+  const treeHeaderSize = llTreeHeaderSize + distTreeHeaderSize;
+
+  let encodedLiterals = 0;
+  let encodedMatches = 0;
 
   for (const token of tokens) {
     if (token.type === 'literal') {
       const codeInfo = llTree.codes.get(token.value)!;
       writer.writeBits(codeInfo.code, codeInfo.bitLen);
+      encodedLiterals++;
     } else {
       const lenInfo = getLengthInfo(token.length);
       const llCodeInfo = llTree.codes.get(lenInfo.code)!;
@@ -208,6 +285,7 @@ export function encodeHuffmanDeflate(tokens: Token[], logs?: CompressionLog[]): 
       if (distInfo.extraBits > 0) {
         writer.writeBits(distInfo.extraVal, distInfo.extraBits);
       }
+      encodedMatches++;
     }
   }
 
@@ -215,6 +293,17 @@ export function encodeHuffmanDeflate(tokens: Token[], logs?: CompressionLog[]): 
   writer.writeBits(eofInfo.code, eofInfo.bitLen);
 
   const res = writer.flush();
-  if (logs) logs.push({ timestamp: performance.now(), phase: '编码完成', message: `编码大小: ${res.length} 字节` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: '编码完成', 
+    level: 'info',
+    message: `编码大小: ${res.length} 字节`,
+    details: {
+      encodedLiterals,
+      encodedMatches,
+      treeHeaderSize: `${treeHeaderSize} bits`,
+      compressedBytes: res.length
+    }
+  });
   return res;
 }

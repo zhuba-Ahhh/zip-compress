@@ -72,7 +72,8 @@ export class HuffmanNodeDeflate {
   ) {}
 }
 
-export function buildHuffmanTreeDeflate(frequencies: number[]) {
+export function buildHuffmanTreeDeflate(frequencies: number[], logs?: any[]) {
+  const startPhase = performance.now();
   const leaves: HuffmanNodeDeflate[] = [];
   for (let i = 0; i < frequencies.length; i++) {
     if (frequencies[i] > 0) {
@@ -82,6 +83,7 @@ export function buildHuffmanTreeDeflate(frequencies: number[]) {
 
   if (leaves.length === 0) {
       const dummy = new HuffmanNodeDeflate(0, 0);
+      if (logs) logs.push({ timestamp: performance.now(), phase: 'Huffman建树(Deflate)', message: '发现空频率表，创建空树', level: 'warn' });
       return { root: dummy, codes: new Map([[0, {code: 0, bitLen: 1}]]) };
   }
   if (leaves.length === 1) {
@@ -100,10 +102,12 @@ export function buildHuffmanTreeDeflate(frequencies: number[]) {
 
   const root = nodes[0];
   const codes = new Map<number, {code: number, bitLen: number}>();
+  let maxDepth = 0;
 
   function traverse(node: HuffmanNodeDeflate, code: number, depth: number) {
     if (node.symbol !== null) {
       codes.set(node.symbol, { code, bitLen: depth });
+      if (depth > maxDepth) maxDepth = depth;
       return;
     }
     if (node.left) traverse(node.left, (code << 1) | 0, depth + 1);
@@ -111,32 +115,53 @@ export function buildHuffmanTreeDeflate(frequencies: number[]) {
   }
 
   traverse(root, 0, 0);
+
+  if (logs) {
+    logs.push({ 
+      timestamp: performance.now(), 
+      phase: 'Huffman建树(Deflate)', 
+      message: `树构建完毕。耗时: ${(performance.now() - startPhase).toFixed(2)}ms`,
+      level: 'debug',
+      details: {
+        leafCount: leaves.length,
+        maxDepth
+      }
+    });
+  }
+
   return { root, codes };
 }
 
-export function serializeTreeDeflate(root: HuffmanNodeDeflate | null, writer: BitWriter, symbolBits: number) {
-  if (!root) return;
+export function serializeTreeDeflate(root: HuffmanNodeDeflate | null, writer: BitWriter, symbolBits: number): number {
+  let bitsWritten = 0;
+  if (!root) return bitsWritten;
   if (root.symbol !== null) {
     writer.writeBit(0);
     writer.writeBits(root.symbol, symbolBits);
+    bitsWritten += 1 + symbolBits;
   } else {
     writer.writeBit(1);
-    serializeTreeDeflate(root.left, writer, symbolBits);
-    serializeTreeDeflate(root.right, writer, symbolBits);
+    bitsWritten += 1;
+    bitsWritten += serializeTreeDeflate(root.left, writer, symbolBits);
+    bitsWritten += serializeTreeDeflate(root.right, writer, symbolBits);
   }
+  return bitsWritten;
 }
 
-export function deserializeTreeDeflate(reader: BitReader, symbolBits: number): HuffmanNodeDeflate | null {
+export function deserializeTreeDeflate(reader: BitReader, symbolBits: number, stats?: { nodesCount: number, leavesCount: number }): HuffmanNodeDeflate | null {
+  if (stats) stats.nodesCount++;
+  
   const bit = reader.readBit();
   if (bit === null) return null;
   if (bit === 0) {
     const symbol = reader.readBits(symbolBits);
     if (symbol === null) return null;
+    if (stats) stats.leavesCount++;
     return new HuffmanNodeDeflate(0, symbol);
   } else {
     const node = new HuffmanNodeDeflate(0);
-    node.left = deserializeTreeDeflate(reader, symbolBits);
-    node.right = deserializeTreeDeflate(reader, symbolBits);
+    node.left = deserializeTreeDeflate(reader, symbolBits, stats);
+    node.right = deserializeTreeDeflate(reader, symbolBits, stats);
     return node;
   }
 }
@@ -161,29 +186,36 @@ export class HuffmanNodeDynamic {
 }
 
 // 写入 Huffman 树 (先序遍历：内部节点=0, 叶子节点=1+9位数据)
-export function writeHuffmanTreeDynamic(node: HuffmanNodeDynamic | null, writer: BitWriter) {
-  if (!node) return;
+export function writeHuffmanTreeDynamic(node: HuffmanNodeDynamic | null, writer: BitWriter): number {
+  let bitsWritten = 0;
+  if (!node) return bitsWritten;
   if (node.value !== null) {
     writer.writeBit(1);
     writer.writeBits(node.value, 9);
+    bitsWritten += 10;
   } else {
     writer.writeBit(0);
-    writeHuffmanTreeDynamic(node.left, writer);
-    writeHuffmanTreeDynamic(node.right, writer);
+    bitsWritten += 1;
+    bitsWritten += writeHuffmanTreeDynamic(node.left, writer);
+    bitsWritten += writeHuffmanTreeDynamic(node.right, writer);
   }
+  return bitsWritten;
 }
 
 // 读取 Huffman 树
-export function readHuffmanTreeDynamic(reader: BitReader): HuffmanNodeDynamic | null {
+export function readHuffmanTreeDynamic(reader: BitReader, stats?: { nodesCount: number, leavesCount: number }): HuffmanNodeDynamic | null {
+  if (stats) stats.nodesCount++;
+
   const bit = reader.readBit();
   if (bit === null) return null;
   if (bit === 1) {
     const val = reader.readBits(9);
     if (val === null) return null;
+    if (stats) stats.leavesCount++;
     return new HuffmanNodeDynamic(val, 0);
   } else {
-    const left = readHuffmanTreeDynamic(reader);
-    const right = readHuffmanTreeDynamic(reader);
+    const left = readHuffmanTreeDynamic(reader, stats);
+    const right = readHuffmanTreeDynamic(reader, stats);
     const node = new HuffmanNodeDynamic(null, 0);
     node.left = left;
     node.right = right;
