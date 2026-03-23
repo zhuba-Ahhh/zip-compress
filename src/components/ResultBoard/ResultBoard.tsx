@@ -49,11 +49,21 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
       .filter(algo => allStats[algo] && !allStats[algo].error)
       .map(algo => {
         const stat = allStats[algo];
+        
+        // 计算吞吐量 MB/s
+        const sizeMB = stat.originalSize / (1024 * 1024);
+        const compressSpeed = stat.avgCompressTime > 0 ? sizeMB / (stat.avgCompressTime / 1000) : 0;
+        const decompressSpeed = stat.avgDecompressTime > 0 ? sizeMB / (stat.avgDecompressTime / 1000) : 0;
+
         return {
           name: algo,
           ratio: parseFloat(stat.ratio),
           compressTime: Number(stat.avgCompressTime.toFixed(2)),
           decompressTime: Number(stat.avgDecompressTime.toFixed(2)),
+          compressSpeed: Number(compressSpeed.toFixed(2)),
+          decompressSpeed: Number(decompressSpeed.toFixed(2)),
+          compressPhases: stat.compressPhases,
+          decompressPhases: stat.decompressPhases
         };
       });
   }, [allStats, algorithms, completedCount]);
@@ -64,7 +74,7 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
     <div style={{ marginTop: 24 }}>
       <Title level={4}>测试结果对比 (循环 {payload.executionCount} 次)</Title>
       
-      {/* 汇总柱状图与散点图 */}
+      {/* 汇总图表 */}
       {completedCount === algorithms.length && chartData.length > 0 && (
         <PerformanceChart data={chartData} />
       )}

@@ -5,6 +5,11 @@ export interface CompressionLog {
   details?: any;
 }
 
+export interface PhaseTiming {
+  name: string; // 阶段名称，如 "构建哈希表", "寻找匹配", "构建Huffman树", "Bitpacking"
+  duration: number; // 耗时(ms)
+}
+
 export interface Stats {
   algorithm: string;
   originalSize: number;
@@ -13,6 +18,8 @@ export interface Stats {
   decompressTime: number; // 总时间
   avgCompressTime: number; // 平均时间
   avgDecompressTime: number; // 平均时间
+  compressPhases?: PhaseTiming[]; // 压缩阶段细粒度耗时
+  decompressPhases?: PhaseTiming[]; // 解压阶段细粒度耗时
   compressThroughput?: number; // 压缩吞吐量 MB/s
   decompressThroughput?: number; // 解压吞吐量 MB/s
   memoryUsage?: number; // 内存消耗 (MB)

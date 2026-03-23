@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { compressData, decompressData } from '../utils/compress';
 import { CompressionAlgorithm } from '../common';
+import { PhaseTiming } from '../types';
 
 export interface WorkerMessage {
   id: number;
@@ -23,9 +24,10 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       let finalDecompressedData: Uint8Array = new Uint8Array();
       let finalIsMatch = false;
       let finalLogs: any[] | undefined = undefined;
+      let finalCompressPhases: PhaseTiming[] | undefined = undefined;
+      let finalDecompressPhases: PhaseTiming[] | undefined = undefined;
 
       for (let iter = 0; iter < executionCount; iter++) {
-        // Compress
         // Memory before compress
         const memBefore = (performance as any).memory ? (performance as any).memory.usedJSHeapSize : 0;
         
@@ -50,6 +52,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
         if (iter === executionCount - 1) {
           finalCompressedData = compressRes.data;
           finalDecompressedData = decompressRes.data;
+          finalCompressPhases = compressRes.phases;
+          finalDecompressPhases = decompressRes.phases;
 
           if (compressRes.logs || decompressRes.logs) {
             finalLogs = [
@@ -87,7 +91,9 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           finalCompressedData,
           finalDecompressedData,
           finalIsMatch,
-          finalLogs
+          finalLogs,
+          compressPhases: finalCompressPhases,
+          decompressPhases: finalDecompressPhases
         }
       });
     }

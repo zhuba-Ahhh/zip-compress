@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Card, Descriptions, Typography, Tag, Space, Button, Spin, Progress, Tooltip } from 'antd';
 import { DownloadOutlined, SyncOutlined, FileTextOutlined } from '@ant-design/icons';
-import { Stats, CompressionLog } from '../../types';
-import { formatSize, downloadFile, compressData, decompressData } from '../../utils';
+import { Stats } from '../../types';
+import { formatSize, downloadFile } from '../../utils';
 import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
 import LogModal from './LogModal';
 import { TestPayload } from './index';
+// 假设这里引入 worker 进行通讯
+import { WorkerMessage } from '../../workers/compression.worker';
 
 const { Text } = Typography;
 
@@ -20,6 +22,7 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
   const [stats, setStats] = useState<Stats | null>(null);
   const [progress, setProgress] = useState(0);
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
+  const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -41,111 +44,81 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
       });
       setProgress(0);
 
-      // 稍微延迟让 UI 有时间渲染 loading 状态
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Create a new worker for each algorithm run to isolate memory and avoid blocking
+      const worker = new Worker(new URL('../../workers/compression.worker.ts', import.meta.url), { type: 'module' });
+      workerRef.current = worker;
 
-      try {
-        let totalCompressTime = 0;
-        let totalDecompressTime = 0;
-        let finalCompressedData: Uint8Array = new Uint8Array();
-        let finalDecompressedData: Uint8Array = new Uint8Array();
-        let finalIsMatch = false;
-        let finalLogs: CompressionLog[] | undefined = undefined;
+      worker.onmessage = (e: MessageEvent) => {
+        if (isCancelled) return;
 
-        for (let iter = 0; iter < payload.executionCount; iter++) {
-          if (isCancelled) return;
+        const { type, progress: currentProgress, result, error } = e.data;
 
-          // 1. Compress
-          const startCompress = performance.now();
-          const compressRes = await compressData(payload.data, algorithm, payload.collectLogs);
-          const endCompress = performance.now();
-          totalCompressTime += (endCompress - startCompress);
-
-          // 2. Decompress
-          const startDecompress = performance.now();
-          const decompressRes = await decompressData(compressRes.data, algorithm, payload.collectLogs);
-          const endDecompress = performance.now();
-          totalDecompressTime += (endDecompress - startDecompress);
-
-          if (iter === payload.executionCount - 1) {
-            finalCompressedData = compressRes.data;
-            finalDecompressedData = decompressRes.data;
-
-            // 合并日志
-            if (compressRes.logs || decompressRes.logs) {
-              finalLogs = [
-                ...(compressRes.logs || []).map(l => ({ ...l, phase: `[压缩] ${l.phase}` })),
-                ...(decompressRes.logs || []).map(l => ({ ...l, phase: `[解压] ${l.phase}` }))
-              ];
-            }
-
-            // 3. Verify on last iteration
-            finalIsMatch = payload.data.length === finalDecompressedData.length;
-            if (finalIsMatch) {
-              for (let i = 0; i < payload.data.length; i++) {
-                if (payload.data[i] !== finalDecompressedData[i]) {
-                  finalIsMatch = false;
-                  break;
-                }
-              }
-            }
-          }
-
-          // 给主线程喘息的机会，并更新进度
-          if (iter % 5 === 0 || iter === payload.executionCount - 1) {
-            setProgress(iter + 1);
-            await new Promise(resolve => setTimeout(resolve, 0));
-          }
+        if (type === 'progress') {
+          setProgress(currentProgress);
+        } else if (type === 'success') {
+          const finalStats: Stats = {
+            algorithm,
+            originalSize: payload.data.length,
+            compressedSize: result.finalCompressedData.length,
+            compressTime: result.totalCompressTime,
+            decompressTime: result.totalDecompressTime,
+            avgCompressTime: result.totalCompressTime / payload.executionCount,
+            avgDecompressTime: result.totalDecompressTime / payload.executionCount,
+            decompressedSize: result.finalDecompressedData.length,
+            ratio: ((result.finalCompressedData.length / payload.data.length) * 100).toFixed(2) + '%',
+            isMatch: result.finalIsMatch,
+            executionCount: payload.executionCount,
+            compressedData: result.finalCompressedData,
+            decompressedData: result.finalDecompressedData,
+            loading: false,
+            logs: result.finalLogs,
+            compressPhases: result.compressPhases,
+            decompressPhases: result.decompressPhases
+          };
+          setStats(finalStats);
+          onComplete(finalStats);
+          worker.terminate();
+        } else if (type === 'error') {
+          const errorStats: Stats = {
+            algorithm,
+            originalSize: payload.data.length,
+            compressedSize: 0,
+            compressTime: 0,
+            decompressTime: 0,
+            avgCompressTime: 0,
+            avgDecompressTime: 0,
+            decompressedSize: 0,
+            ratio: 'N/A',
+            isMatch: false,
+            executionCount: payload.executionCount,
+            error: error || '压缩失败',
+            loading: false,
+          };
+          setStats(errorStats);
+          onComplete(errorStats);
+          worker.terminate();
         }
+      };
 
-        if (isCancelled) return;
+      const message: WorkerMessage = {
+        id: payload.triggerId,
+        action: 'runTest',
+        data: payload.data,
+        algorithm,
+        collectLogs: payload.collectLogs,
+        executionCount: payload.executionCount
+      };
 
-        const finalStats: Stats = {
-          algorithm,
-          originalSize: payload.data.length,
-          compressedSize: finalCompressedData.length,
-          compressTime: totalCompressTime,
-          decompressTime: totalDecompressTime,
-          avgCompressTime: totalCompressTime / payload.executionCount,
-          avgDecompressTime: totalDecompressTime / payload.executionCount,
-          decompressedSize: finalDecompressedData.length,
-          ratio: ((finalCompressedData.length / payload.data.length) * 100).toFixed(2) + '%',
-          isMatch: finalIsMatch,
-          executionCount: payload.executionCount,
-          compressedData: finalCompressedData,
-          decompressedData: finalDecompressedData,
-          loading: false,
-          logs: finalLogs,
-        };
-        setStats(finalStats);
-        onComplete(finalStats);
-
-      } catch (err: unknown) {
-        if (isCancelled) return;
-        const errorStats: Stats = {
-          algorithm,
-          originalSize: payload.data.length,
-          compressedSize: 0,
-          compressTime: 0,
-          decompressTime: 0,
-          avgCompressTime: 0,
-          avgDecompressTime: 0,
-          decompressedSize: 0,
-          ratio: 'N/A',
-          isMatch: false,
-          executionCount: payload.executionCount,
-          error: (err as Error)?.message || '压缩失败',
-          loading: false,
-        };
-        setStats(errorStats);
-        onComplete(errorStats);
-      }
+      worker.postMessage(message);
     };
 
     runTest();
 
     return () => {
       isCancelled = true;
+      if (workerRef.current) {
+        workerRef.current.terminate();
+      }
     };
   }, [algorithm, payload]);
 
