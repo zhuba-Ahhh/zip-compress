@@ -1,12 +1,13 @@
 import { BitWriter } from './BitWriter';
 import { BitReader } from './BitReader';
 import { HuffmanNode } from './Huffman';
-import { PhaseTiming, CompressionLog } from '../../../types';
+import { PhaseTiming, CompressionLog, AdvancedMetrics } from '../../../types';
 
 export interface MyZipCompressResult {
   data: Uint8Array;
   logs?: CompressionLog[];
   phases?: PhaseTiming[];
+  advancedMetrics?: AdvancedMetrics;
 }
 
 /**
@@ -24,6 +25,19 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
 
+  const advancedMetrics: AdvancedMetrics = {
+    chunks: [],
+    timeSeries: []
+  };
+  const CHUNK_SIZE = 16384; // 16KB blocks for heatmap
+  let currentChunkStart = 0;
+  let currentChunkCompressedBits = 0;
+  
+  const SAMPLE_INTERVAL_MS = 5; // 5ms for time series
+  let lastSampleTime = performance.now();
+  let lastSampleBytes = 0;
+
+
   const trackPhase = (name: string, fn: () => void) => {
     const start = performance.now();
     fn();
@@ -40,7 +54,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
 
   if (len === 0) {
     const emptyResult = new Uint8Array(0);
-    return collectLogs ? { data: emptyResult, logs, phases } : emptyResult;
+    return collectLogs ? { data: emptyResult, logs, phases, advancedMetrics } : emptyResult;
   }
 
   let writer!: BitWriter;
@@ -110,7 +124,21 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   trackPhase('LZ77匹配(Pass 1)', () => {
     addLog('LZ77匹配', '开始执行 LZ77 匹配过程');
 
-    while (cursor < len) {
+    const startTime = performance.now();
+  while (cursor < len) {
+    const now = performance.now();
+    if (collectLogs && now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+      const processed = cursor;
+      const deltaBytes = processed - lastSampleBytes;
+      const deltaMs = now - lastSampleTime;
+      advancedMetrics.timeSeries.push({
+        timeMs: now - startTime,
+        processedBytes: processed,
+        instantSpeed: deltaMs > 0 ? (deltaBytes / 1024 / 1024) / (deltaMs / 1000) : 0
+      });
+      lastSampleTime = now;
+      lastSampleBytes = processed;
+    }
     insertString(cursor);
     const match = findMatch(cursor);
 
@@ -157,8 +185,38 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
       cursor++;
       literalCount++;
     }
+
+    // Heatmap tracking
+    if (collectLogs) {
+      // Rough estimation of bits
+      if (match.len >= MIN_MATCH_LENGTH && match.dist > 0 && match.dist <= WINDOW_SIZE) {
+         currentChunkCompressedBits += 24; // approx 1 bit flag + 12 dist + 11 len = 24 bits
+      } else {
+         currentChunkCompressedBits += 9; // approx 1 bit flag + 8 bit lit = 9 bits
+      }
+
+      if (cursor - currentChunkStart >= CHUNK_SIZE) {
+        advancedMetrics.chunks.push({
+          offset: currentChunkStart,
+          originalSize: cursor - currentChunkStart,
+          compressedSize: currentChunkCompressedBits / 8,
+          ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+        });
+        currentChunkStart = cursor;
+        currentChunkCompressedBits = 0;
+      }
+    }
+
   }
 
+  if (collectLogs && cursor > currentChunkStart) {
+    advancedMetrics.chunks.push({
+      offset: currentChunkStart,
+      originalSize: cursor - currentChunkStart,
+      compressedSize: currentChunkCompressedBits / 8,
+      ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+    });
+  }
   addLog('LZ77完成', `LZ77 匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`);
   });
 
@@ -250,7 +308,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
     writer.writeBit(0);
     writer.writeBytes(buffer);
     const resultData = writer.flush();
-    return collectLogs ? { data: resultData, logs, phases } : resultData;
+    return collectLogs ? { data: resultData, logs, phases, advancedMetrics } : resultData;
   }
 
   trackPhase('位流封装', () => {
@@ -282,7 +340,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   });
   
   const resultDataFinal = writer.flush();
-  return collectLogs ? { data: resultDataFinal, logs, phases } : resultDataFinal;
+  return collectLogs ? { data: resultDataFinal, logs, phases, advancedMetrics } : resultDataFinal;
 }
 
 export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | MyZipCompressResult {

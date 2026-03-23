@@ -13,6 +13,8 @@ interface ControlPanelProps {
   setExecutionCount: (count: number) => void;
   collectLogs: boolean;
   setCollectLogs: (collect: boolean) => void;
+  showAdvancedMetrics: boolean;
+  setShowAdvancedMetrics: (show: boolean) => void;
   loading: boolean;
   onRunTest: () => void;
 }
@@ -24,6 +26,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   setExecutionCount,
   collectLogs,
   setCollectLogs,
+  showAdvancedMetrics,
+  setShowAdvancedMetrics,
   loading,
   onRunTest
 }) => {
@@ -66,6 +70,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             <Switch
               checked={collectLogs}
               onChange={setCollectLogs}
+              checkedChildren={zhCN.on}
+              unCheckedChildren={zhCN.off}
+            />
+          </Space>
+
+          <Space>
+            <Text strong>高级分析</Text>
+            <Switch
+              checked={showAdvancedMetrics}
+              onChange={setShowAdvancedMetrics}
               checkedChildren={zhCN.on}
               unCheckedChildren={zhCN.off}
             />

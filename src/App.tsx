@@ -59,6 +59,14 @@ const App: React.FC = () => {
   });
 
   const [collectLogs, setCollectLogs] = useState<boolean>(true);
+  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEYS.SHOW_ADVANCED_METRICS);
+      return saved ? JSON.parse(saved) : DEFAULT_VALUES.SHOW_ADVANCED_METRICS;
+    } catch {
+      return DEFAULT_VALUES.SHOW_ADVANCED_METRICS;
+    }
+  });
 
   const [originalFileName, setOriginalFileName] = useState<string>('data');
 
@@ -78,6 +86,10 @@ const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.RANDOMNESS, randomness.toString());
   }, [randomness]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.SHOW_ADVANCED_METRICS, JSON.stringify(showAdvancedMetrics));
+  }, [showAdvancedMetrics]);
 
   const handleGenerateRandomText = (showMsg = true) => {
     const text = generateRandomText({ length: randomLength, randomness });
@@ -189,6 +201,8 @@ const App: React.FC = () => {
             setExecutionCount={setExecutionCount}
             collectLogs={collectLogs}
             setCollectLogs={setCollectLogs}
+            showAdvancedMetrics={showAdvancedMetrics}
+            setShowAdvancedMetrics={setShowAdvancedMetrics}
             loading={loading}
             onRunTest={handleRunTest}
           />
@@ -197,6 +211,7 @@ const App: React.FC = () => {
             algorithms={algorithms}
             payload={testPayload}
             originalFileName={originalFileName}
+            showAdvancedMetrics={showAdvancedMetrics}
             onAllComplete={() => setLoading(false)}
           />
         </Card>

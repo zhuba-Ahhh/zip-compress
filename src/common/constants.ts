@@ -3,6 +3,7 @@ export const STORAGE_KEYS = {
   EXECUTION_COUNT: 'compress-ui-execution-count',
   RANDOM_LENGTH: 'compress-ui-random-length',
   RANDOMNESS: 'compress-ui-randomness',
+  SHOW_ADVANCED_METRICS: 'compress-ui-show-advanced-metrics',
 };
 
 export const DEFAULT_VALUES = {
@@ -10,4 +11,5 @@ export const DEFAULT_VALUES = {
   RANDOMNESS: 0.6,
   EXECUTION_COUNT: 1,
   ALGORITHMS: ['pako', 'lz-string'],
+  SHOW_ADVANCED_METRICS: true,
 };

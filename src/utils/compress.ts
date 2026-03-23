@@ -21,6 +21,7 @@ export interface DetailedCompressionResult {
   data: Uint8Array;
   logs?: CompressionLog[];
   phases?: PhaseTiming[];
+  advancedMetrics?: import('@/types').AdvancedMetrics;
 }
 
 const compressors: Record<string, (data: Uint8Array, collectLogs?: boolean) => Uint8Array | Promise<Uint8Array> | DetailedCompressionResult> = {

@@ -5,6 +5,7 @@ import { Stats } from '@/types';
 import { formatSize, downloadFile } from '@/utils';
 import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
 import LogModal from './LogModal';
+import AdvancedMetricsChart from './AdvancedMetricsChart';
 import { TestPayload } from './index';
 // 假设这里引入 worker 进行通讯
 import { zhCN } from '@/locales/zh-CN';
@@ -16,10 +17,11 @@ export interface AlgorithmCardProps {
   algorithm: CompressionAlgorithm;
   payload: TestPayload;
   originalFileName: string;
+  showAdvancedMetrics: boolean;
   onComplete: (stats: Stats) => void;
 }
 
-const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, originalFileName, onComplete }) => {
+const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, originalFileName, showAdvancedMetrics, onComplete }) => {
   const [stats, setStats] = useState<Stats | null>(null);
   const [progress, setProgress] = useState(0);
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
@@ -74,7 +76,8 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
             loading: false,
             logs: result.finalLogs,
             compressPhases: result.compressPhases,
-            decompressPhases: result.decompressPhases
+            decompressPhases: result.decompressPhases,
+            advancedMetrics: result.advancedMetrics
           };
           setStats(finalStats);
           onComplete(finalStats);
@@ -224,8 +227,15 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
                 )}
             </Descriptions>
           )}
+          {!stats.loading && stats.advancedMetrics && showAdvancedMetrics && (
+            <AdvancedMetricsChart
+              metrics={stats.advancedMetrics}
+              algorithmName={algorithmName?.description || stats.algorithm}
+            />
+          )}
         </Spin>
       </Card>
+
       <LogModal
         visible={isLogModalVisible}
         onCancel={() => setIsLogModalVisible(false)}

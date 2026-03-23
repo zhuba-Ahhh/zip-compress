@@ -20,7 +20,7 @@ const HASH_MASK_2 = HASH_SIZE_2 - 1;
 /**
  * 基础版：暴力匹配 LZ77
  */
-export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]): Token[] {
+export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: import('../../../../types').AdvancedMetrics): Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
   
@@ -32,7 +32,31 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
   let maxMatchLen = 0;
   const hashCollisions = 0; // 仅为统一日志格式，暴力匹配无碰撞
 
+  let lastSampleTime = performance.now();
+  let lastSampleBytes = 0;
+  let currentChunkStart = 0;
+  let currentChunkCompressedBits = 0;
+  const startTime = performance.now();
+  const CHUNK_SIZE = 16384;
+  const SAMPLE_INTERVAL_MS = 5;
+
+
   while (cursor < buffer.length) {
+
+    const now = performance.now();
+    if (advancedMetrics && now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+      const processed = cursor;
+      const deltaBytes = processed - lastSampleBytes;
+      const deltaMs = now - lastSampleTime;
+      advancedMetrics.timeSeries.push({
+        timeMs: now - startTime,
+        processedBytes: processed,
+        instantSpeed: deltaMs > 0 ? (deltaBytes / 1024 / 1024) / (deltaMs / 1000) : 0
+      });
+      lastSampleTime = now;
+      lastSampleBytes = processed;
+    }
+
     let bestMatchLen = 0;
     let bestMatchDist = 0;
 
@@ -77,11 +101,37 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
       matchCount++;
       totalMatchLen += bestMatchLen;
       if (bestMatchLen > maxMatchLen) maxMatchLen = bestMatchLen;
+
+      if (advancedMetrics) currentChunkCompressedBits += 24;
+
     } else {
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
       literalCount++;
+
+      if (advancedMetrics) currentChunkCompressedBits += 9;
+
     }
+
+    if (advancedMetrics && cursor - currentChunkStart >= CHUNK_SIZE) {
+      advancedMetrics.chunks.push({
+        offset: currentChunkStart,
+        originalSize: cursor - currentChunkStart,
+        compressedSize: currentChunkCompressedBits / 8,
+        ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+      });
+      currentChunkStart = cursor;
+      currentChunkCompressedBits = 0;
+    }
+  }
+
+  if (advancedMetrics && cursor > currentChunkStart) {
+    advancedMetrics.chunks.push({
+      offset: currentChunkStart,
+      originalSize: cursor - currentChunkStart,
+      compressedSize: currentChunkCompressedBits / 8,
+      ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+    });
   }
 
   if (logs) logs.push({ 
@@ -105,12 +155,21 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
 /**
  * 优化版1：哈希链表匹配 LZ77
  */
-export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[]): Token[] {
+export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: import('../../../../types').AdvancedMetrics): Token[] {
   const tokens: Token[] = [];
   const len = buffer.length;
   let cursor = 0;
   
   if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77匹配', message: '开始哈希链表匹配' });
+
+
+  let lastSampleTime = performance.now();
+  let lastSampleBytes = 0;
+  let currentChunkStart = 0;
+  let currentChunkCompressedBits = 0;
+  const startTime = performance.now();
+  const CHUNK_SIZE = 16384;
+  const SAMPLE_INTERVAL_MS = 5;
 
   const head = new Int32Array(HASH_MASK + 1).fill(-1);
   const prev = new Int32Array(len).fill(-1);
@@ -132,6 +191,21 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
   };
 
   while (cursor < len) {
+
+    const now = performance.now();
+    if (advancedMetrics && now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+      const processed = cursor;
+      const deltaBytes = processed - lastSampleBytes;
+      const deltaMs = now - lastSampleTime;
+      advancedMetrics.timeSeries.push({
+        timeMs: now - startTime,
+        processedBytes: processed,
+        instantSpeed: deltaMs > 0 ? (deltaBytes / 1024 / 1024) / (deltaMs / 1000) : 0
+      });
+      lastSampleTime = now;
+      lastSampleBytes = processed;
+    }
+
     insertString(cursor);
 
     let matchHead = prev[cursor];
@@ -193,7 +267,31 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
       literalCount++;
+
+      if (advancedMetrics) currentChunkCompressedBits += 9;
+
     }
+
+    if (advancedMetrics && cursor - currentChunkStart >= CHUNK_SIZE) {
+      advancedMetrics.chunks.push({
+        offset: currentChunkStart,
+        originalSize: cursor - currentChunkStart,
+        compressedSize: currentChunkCompressedBits / 8,
+        ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+      });
+      currentChunkStart = cursor;
+      currentChunkCompressedBits = 0;
+    }
+
+  }
+
+  if (advancedMetrics && cursor > currentChunkStart) {
+    advancedMetrics.chunks.push({
+      offset: currentChunkStart,
+      originalSize: cursor - currentChunkStart,
+      compressedSize: currentChunkCompressedBits / 8,
+      ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+    });
   }
 
   if (logs) logs.push({ 
@@ -217,11 +315,20 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
 /**
  * 优化版2：环形数组哈希链表匹配 LZ77
  */
-export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: CompressionLog[]): Token[] {
+export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: import('../../../../types').AdvancedMetrics): Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
 
   if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77匹配', message: '开始环形数组哈希链表匹配' });
+
+
+  let lastSampleTime = performance.now();
+  let lastSampleBytes = 0;
+  let currentChunkStart = 0;
+  let currentChunkCompressedBits = 0;
+  const startTime = performance.now();
+  const CHUNK_SIZE = 16384;
+  const SAMPLE_INTERVAL_MS = 5;
 
   const head = new Int32Array(HASH_SIZE_2).fill(-1);
   const prev = new Int32Array(WINDOW_SIZE + 1).fill(-1);
@@ -237,6 +344,21 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
   let hashCollisions = 0;
 
   while (cursor < buffer.length) {
+
+    const now = performance.now();
+    if (advancedMetrics && now - lastSampleTime >= SAMPLE_INTERVAL_MS) {
+      const processed = cursor;
+      const deltaBytes = processed - lastSampleBytes;
+      const deltaMs = now - lastSampleTime;
+      advancedMetrics.timeSeries.push({
+        timeMs: now - startTime,
+        processedBytes: processed,
+        instantSpeed: deltaMs > 0 ? (deltaBytes / 1024 / 1024) / (deltaMs / 1000) : 0
+      });
+      lastSampleTime = now;
+      lastSampleBytes = processed;
+    }
+
     let bestMatchLen = 0;
     let bestMatchDist = 0;
 
@@ -309,7 +431,31 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
       literalCount++;
+
+      if (advancedMetrics) currentChunkCompressedBits += 9;
+
     }
+
+    if (advancedMetrics && cursor - currentChunkStart >= CHUNK_SIZE) {
+      advancedMetrics.chunks.push({
+        offset: currentChunkStart,
+        originalSize: cursor - currentChunkStart,
+        compressedSize: currentChunkCompressedBits / 8,
+        ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+      });
+      currentChunkStart = cursor;
+      currentChunkCompressedBits = 0;
+    }
+
+  }
+
+  if (advancedMetrics && cursor > currentChunkStart) {
+    advancedMetrics.chunks.push({
+      offset: currentChunkStart,
+      originalSize: cursor - currentChunkStart,
+      compressedSize: currentChunkCompressedBits / 8,
+      ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+    });
   }
 
   if (logs) logs.push({ 

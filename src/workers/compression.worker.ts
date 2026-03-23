@@ -25,6 +25,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
       let finalLogs: any[] | undefined = undefined;
       let finalCompressPhases: PhaseTiming[] | undefined = undefined;
       let finalDecompressPhases: PhaseTiming[] | undefined = undefined;
+      let finalAdvancedMetrics: any = undefined;
 
       for (let iter = 0; iter < executionCount; iter++) {
         // Memory before compress
@@ -53,6 +54,7 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           finalDecompressedData = decompressRes.data;
           finalCompressPhases = compressRes.phases;
           finalDecompressPhases = decompressRes.phases;
+          finalAdvancedMetrics = (compressRes as any).advancedMetrics;
 
           if (compressRes.logs || decompressRes.logs) {
             finalLogs = [
@@ -92,7 +94,8 @@ self.onmessage = async (e: MessageEvent<WorkerMessage>) => {
           finalIsMatch,
           finalLogs,
           compressPhases: finalCompressPhases,
-          decompressPhases: finalDecompressPhases
+          decompressPhases: finalDecompressPhases,
+          advancedMetrics: finalAdvancedMetrics
         }
       });
     }

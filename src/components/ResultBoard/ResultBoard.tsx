@@ -19,10 +19,11 @@ export interface ResultBoardProps {
   algorithms: CompressionAlgorithm[];
   payload: TestPayload | null;
   originalFileName: string;
+  showAdvancedMetrics: boolean;
   onAllComplete?: () => void;
 }
 
-const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, originalFileName, onAllComplete }) => {
+const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, originalFileName, showAdvancedMetrics, onAllComplete }) => {
   const [allStats, setAllStats] = useState<Record<string, Stats>>({});
   const [completedCount, setCompletedCount] = useState(0);
 
@@ -82,6 +83,7 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
               algorithm={algo}
               payload={payload}
               originalFileName={originalFileName}
+              showAdvancedMetrics={showAdvancedMetrics}
               onComplete={handleComplete}
             />
           </Col>

@@ -8,6 +8,25 @@ export interface CompressionLog {
   details?: any;
 }
 
+
+export interface ChunkMetric {
+  offset: number;     // Starting offset in original file
+  originalSize: number; // Block size in bytes
+  compressedSize: number; // Compressed size in bytes (can be fractional if bits)
+  ratio: number;      // compressed / original
+}
+
+export interface TimeMetric {
+  timeMs: number;     // Elapsed time
+  processedBytes: number; // Total bytes processed at this time
+  instantSpeed: number; // MB/s since last tick
+}
+
+export interface AdvancedMetrics {
+  chunks: ChunkMetric[];
+  timeSeries: TimeMetric[];
+}
+
 export interface PhaseTiming {
   name: string; // 阶段名称，如 "构建哈希表", "寻找匹配", "构建Huffman树", "Bitpacking"
   duration: number; // 耗时(ms)
@@ -35,5 +54,6 @@ export interface Stats {
   compressedData?: Uint8Array;
   decompressedData?: Uint8Array;
   loading?: boolean;
-  logs?: CompressionLog[]; // 新增日志数组
+  logs?: CompressionLog[];
+  advancedMetrics?: AdvancedMetrics;
 }
