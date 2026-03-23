@@ -1,4 +1,5 @@
 import { Token, WINDOW_SIZE, MAX_MATCH_LENGTH, MIN_MATCH_LENGTH } from './types';
+import { CompressionLog } from '../../../../types';
 
 // ==========================================
 // 哈希表参数，用于快速字符串匹配
@@ -18,20 +19,15 @@ const HASH_MASK_2 = HASH_SIZE_2 - 1;
 
 /**
  * 基础版：暴力匹配 LZ77
- * 
- * 原理：
- * 每次处理一个字符时，都在滑动窗口（windowStart 到 cursor）中暴力搜索最长匹配的字符串。
- * 
- * 性能：
- * - 时间复杂度：O(N * WINDOW_SIZE)，在遇到长重复字符串时性能极差。
- * - 空间复杂度：O(1)，不需要额外的数据结构。
- * 
- * @param buffer 需要压缩的原始数据 (Uint8Array)
- * @returns Token 数组，包含 literal（字面量）和 match（匹配的距离和长度）
  */
-export function lz77CompressSimple(buffer: Uint8Array): Token[] {
+export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]): Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
+  
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Simple', message: 'Starting brute-force LZ77 matching...' });
+
+  let matchCount = 0;
+  let literalCount = 0;
 
   while (cursor < buffer.length) {
     let bestMatchLen = 0;
@@ -53,44 +49,57 @@ export function lz77CompressSimple(buffer: Uint8Array): Token[] {
 
     if (bestMatchLen >= MIN_MATCH_LENGTH) {
       tokens.push({ type: 'match', distance: bestMatchDist, length: bestMatchLen });
+      
+      if (logs && matchCount < 10) { // 增加日志记录的数量
+        // 提取匹配的文本以便在日志中展示
+        const matchTextBytes = Array.from(buffer.slice(cursor, cursor + bestMatchLen));
+        const matchText = String.fromCharCode(...matchTextBytes).replace(/[^\x20-\x7E]/g, '.'); // 简单地将非可打印字符转为点
+        
+        logs.push({ 
+          timestamp: performance.now(), 
+          phase: 'LZ77 Simple Match', 
+          message: `找到匹配: 距离=${bestMatchDist}, 长度=${bestMatchLen}`,
+          details: {
+            cursor,
+            matchedString: matchText,
+            matchBytes: matchTextBytes,
+            distance: bestMatchDist,
+            length: bestMatchLen,
+            note: matchCount === 9 ? '为避免日志过多，后续匹配将不再详细记录...' : undefined
+          }
+        });
+      }
+      
       cursor += bestMatchLen;
+      matchCount++;
     } else {
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
+      literalCount++;
     }
   }
 
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Simple Finished', message: `Completed. Found ${matchCount} matches and ${literalCount} literals.` });
   return tokens;
 }
 
 /**
  * 优化版1：哈希链表匹配 LZ77
- * 
- * 原理：
- * 引入哈希表（head 数组）和哈希链表（prev 数组）来加速匹配过程。
- * 每次读取 3 个字节计算哈希值，通过哈希值快速定位到最近一次出现相同字符串的位置，
- * 然后沿着 prev 链表向前查找，直到找到最长匹配。
- * 
- * 性能：
- * - 时间复杂度：平均 O(N)，最坏情况由于加入了 `chainLength` 限制，退化为 O(N * 256)。
- * - 空间复杂度：O(N + HASH_SIZE)，需要存储全量数据的 prev 数组。
- * 
- * @param buffer 需要压缩的原始数据
- * @returns Token 数组
  */
-export function lz77CompressHashChain(buffer: Uint8Array): Token[] {
+export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[]): Token[] {
   const tokens: Token[] = [];
   const len = buffer.length;
   let cursor = 0;
+  
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 HashChain', message: 'Starting Hash Chain LZ77 matching...' });
 
-  // head 数组：存储某个哈希值最近一次出现的位置
   const head = new Int32Array(HASH_MASK + 1).fill(-1);
-  // prev 数组：构建哈希链表，prev[pos] 存储与 buffer[pos] 哈希值相同的前一个位置
   const prev = new Int32Array(len).fill(-1);
 
   let currentHash = 0;
+  let matchCount = 0;
+  let literalCount = 0;
 
-  // 将当前位置的 3 字节字符串哈希并插入到哈希链表中
   const insertString = (pos: number) => {
     if (pos <= len - MIN_MATCH_LENGTH) {
       currentHash = ((buffer[pos] << (HASH_SHIFT * 2)) ^ (buffer[pos + 1] << HASH_SHIFT) ^ buffer[pos + 2]) & HASH_MASK;
@@ -100,21 +109,18 @@ export function lz77CompressHashChain(buffer: Uint8Array): Token[] {
   };
 
   while (cursor < len) {
-    // 每次处理当前位置前，先将其插入哈希表
     insertString(cursor);
 
     let matchHead = prev[cursor];
     const limit = Math.max(0, cursor - WINDOW_SIZE);
-    let chainLength = 256; // 限制查找深度，防止最坏情况
+    let chainLength = 256; 
     let bestMatchLen = 0;
     let bestMatchDist = 0;
 
-    // 沿着哈希链表向前查找最佳匹配
     while (matchHead >= limit && matchHead >= 0 && matchHead < cursor && chainLength-- > 0) {
       let matchLen = 0;
       const lookahead = Math.min(len - cursor, MAX_MATCH_LENGTH);
 
-      // 先快速比较第一个字符和已知最佳长度的字符，匹配再进行详细比较
       if (buffer[matchHead + bestMatchLen] === buffer[cursor + bestMatchLen]) {
         while (matchLen < lookahead && buffer[matchHead + matchLen] === buffer[cursor + matchLen]) {
           matchLen++;
@@ -123,56 +129,70 @@ export function lz77CompressHashChain(buffer: Uint8Array): Token[] {
         if (matchLen > bestMatchLen) {
           bestMatchLen = matchLen;
           bestMatchDist = cursor - matchHead;
-          if (bestMatchLen >= MAX_MATCH_LENGTH) break; // 达到最大长度，直接停止查找
+          if (bestMatchLen >= MAX_MATCH_LENGTH) break; 
         }
       }
-      matchHead = prev[matchHead]; // 沿着链表继续找上一个相同哈希的位置
+      matchHead = prev[matchHead]; 
     }
 
     if (bestMatchLen >= MIN_MATCH_LENGTH) {
       tokens.push({ type: 'match', distance: bestMatchDist, length: bestMatchLen });
-      // 匹配部分跳过，但需要将其插入哈希链表以备后续查找
+      
+      if (logs && matchCount < 10) {
+        const matchTextBytes = Array.from(buffer.slice(cursor, cursor + bestMatchLen));
+        const matchText = String.fromCharCode(...matchTextBytes).replace(/[^\x20-\x7E]/g, '.');
+        
+        logs.push({ 
+          timestamp: performance.now(), 
+          phase: 'LZ77 HashChain Match', 
+          message: `找到匹配: 距离=${bestMatchDist}, 长度=${bestMatchLen}`,
+          details: {
+            cursor,
+            matchedString: matchText,
+            matchBytes: matchTextBytes,
+            distance: bestMatchDist,
+            length: bestMatchLen,
+            chainLookups: 256 - chainLength,
+            note: matchCount === 9 ? '为避免日志过多，后续匹配将不再详细记录...' : undefined
+          }
+        });
+      }
+      
       for (let i = 1; i < bestMatchLen; i++) {
         cursor++;
         insertString(cursor);
       }
       cursor++;
+      matchCount++;
     } else {
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
+      literalCount++;
     }
   }
 
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 HashChain Finished', message: `Completed. Found ${matchCount} matches and ${literalCount} literals.` });
   return tokens;
 }
 
 /**
  * 优化版2：环形数组哈希链表匹配 LZ77
- * 
- * 原理：
- * 进一步优化空间复杂度。由于匹配距离最大只有 WINDOW_SIZE（4095），
- * 因此我们不需要保存整个 buffer 的 prev 链表，只需要一个大小为 WINDOW_SIZE + 1 的环形数组。
- * 
- * 性能：
- * - 时间复杂度：平均 O(N)。加入了 `limit` 限制查找深度，同时加入了快速剪枝（比较最佳长度处的字符）。
- * - 空间复杂度：O(WINDOW_SIZE + HASH_SIZE)，内存占用极小且固定。
- * 
- * @param buffer 需要压缩的原始数据
- * @returns Token 数组
  */
-export function lz77CompressHashChainOptimized(buffer: Uint8Array): Token[] {
+export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: CompressionLog[]): Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
 
-  // head 记录特定 hash 值最后一次出现的位置
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Optimized', message: 'Starting Optimized Hash Chain LZ77 matching...' });
+
   const head = new Int32Array(HASH_SIZE_2).fill(-1);
-  // prev 记录滑动窗口内，同一个 hash 值上一次出现的位置 (环形数组)
   const prev = new Int32Array(WINDOW_SIZE + 1).fill(-1);
 
-  // 计算 3 字节的哈希值
   const getHash = (idx: number) => {
     return ((buffer[idx] << (HASH_SHIFT * 2)) ^ (buffer[idx + 1] << HASH_SHIFT) ^ buffer[idx + 2]) & HASH_MASK_2;
   };
+  
+  let matchCount = 0;
+  let literalCount = 0;
 
   while (cursor < buffer.length) {
     let bestMatchLen = 0;
@@ -180,21 +200,17 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array): Token[] {
 
     const lookahead = Math.min(buffer.length - cursor, MAX_MATCH_LENGTH);
 
-    // 只有剩余字符 >= MIN_MATCH_LENGTH 时才去查哈希表找 Match
     if (lookahead >= MIN_MATCH_LENGTH) {
       const hash = getHash(cursor);
       let matchIdx = head[hash];
 
-      // 将当前位置插入哈希链表头部
       prev[cursor % (WINDOW_SIZE + 1)] = matchIdx;
       head[hash] = cursor;
 
-      // 限制最大遍历深度，防止哈希冲突或极度重复的数据导致退化
       let limit = 256; 
       const windowStart = Math.max(0, cursor - WINDOW_SIZE);
 
       while (matchIdx >= windowStart && limit > 0) {
-        // 快速剪枝：如果当前最好长度位置的字符不匹配，直接跳过全量比较
         if (buffer[matchIdx + bestMatchLen] === buffer[cursor + bestMatchLen]) {
           let len = 0;
           while (len < lookahead && buffer[matchIdx + len] === buffer[cursor + len]) {
@@ -203,7 +219,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array): Token[] {
           if (len > bestMatchLen) {
             bestMatchLen = len;
             bestMatchDist = cursor - matchIdx;
-            if (len === lookahead) break; // 已经是最长可能的匹配了，提前结束
+            if (len === lookahead) break; 
           }
         }
         matchIdx = prev[matchIdx % (WINDOW_SIZE + 1)];
@@ -214,7 +230,25 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array): Token[] {
     if (bestMatchLen >= MIN_MATCH_LENGTH) {
       tokens.push({ type: 'match', distance: bestMatchDist, length: bestMatchLen });
       
-      // 匹配到的中间字符也需要插入到哈希表中，保持字典完整
+      if (logs && matchCount < 10) {
+        const matchTextBytes = Array.from(buffer.slice(cursor, cursor + bestMatchLen));
+        const matchText = String.fromCharCode(...matchTextBytes).replace(/[^\x20-\x7E]/g, '.');
+        
+        logs.push({ 
+          timestamp: performance.now(), 
+          phase: 'LZ77 Optimized Match', 
+          message: `找到匹配: 距离=${bestMatchDist}, 长度=${bestMatchLen}`,
+          details: {
+            cursor,
+            matchedString: matchText,
+            matchBytes: matchTextBytes,
+            distance: bestMatchDist,
+            length: bestMatchLen,
+            note: matchCount === 9 ? '为避免日志过多，后续匹配将不再详细记录...' : undefined
+          }
+        });
+      }
+      
       for (let i = 1; i < bestMatchLen; i++) {
         cursor++;
         if (cursor + MIN_MATCH_LENGTH <= buffer.length) {
@@ -224,11 +258,14 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array): Token[] {
         }
       }
       cursor++;
+      matchCount++;
     } else {
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
+      literalCount++;
     }
   }
 
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Optimized Finished', message: `Completed. Found ${matchCount} matches and ${literalCount} literals.` });
   return tokens;
 }

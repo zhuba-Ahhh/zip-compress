@@ -1,5 +1,5 @@
 import React from 'react';
-import { Space, Typography, Select, InputNumber, Button } from 'antd';
+import { Space, Typography, Select, InputNumber, Button, Switch } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
 import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
 
@@ -10,6 +10,8 @@ interface ControlPanelProps {
   setAlgorithms: (algos: CompressionAlgorithm[]) => void;
   executionCount: number;
   setExecutionCount: (count: number) => void;
+  collectLogs: boolean;
+  setCollectLogs: (collect: boolean) => void;
   loading: boolean;
   onRunTest: () => void;
 }
@@ -19,6 +21,8 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
   setAlgorithms,
   executionCount,
   setExecutionCount,
+  collectLogs,
+  setCollectLogs,
   loading,
   onRunTest
 }) => {
@@ -43,7 +47,6 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             )}
           />
         </Space>
-        
         <Space>
           <Text strong>执行次数:</Text>
           <InputNumber 
@@ -52,6 +55,16 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
             value={executionCount} 
             onChange={(val) => setExecutionCount(val || 1)} 
             style={{ width: 100 }}
+          />
+        </Space>
+
+        <Space>
+          <Text strong>收集日志:</Text>
+          <Switch
+            checked={collectLogs}
+            onChange={setCollectLogs}
+            checkedChildren="开"
+            unCheckedChildren="关"
           />
         </Space>
       </Space>

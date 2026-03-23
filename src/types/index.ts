@@ -1,3 +1,10 @@
+export interface CompressionLog {
+  timestamp: number;
+  phase: string;
+  message: string;
+  details?: any;
+}
+
 export interface Stats {
   algorithm: string;
   originalSize: number;
@@ -15,4 +22,5 @@ export interface Stats {
   compressedData?: Uint8Array;
   decompressedData?: Uint8Array;
   loading?: boolean;
+  logs?: CompressionLog[]; // 新增日志数组
 }

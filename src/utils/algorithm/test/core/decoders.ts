@@ -1,10 +1,11 @@
 import { MIN_MATCH_LENGTH } from './types';
-import { BitReader } from './io';
+import { BitReader, DynamicUint8Array } from './io';
 import {
   getLengthBase, getDistanceBase,
   deserializeTreeDeflate, HuffmanNodeDeflate,
   readHuffmanTreeDynamic, HuffmanNodeDynamic
 } from './huffman-utils';
+import { CompressionLog } from '../../../../types';
 
 /**
  * 解码器 1：简单的 Bitpacking 解码 (对应原 LZ77.ts, LZ77-1.ts, LZ77-2.ts)
@@ -18,9 +19,13 @@ import {
  * @param buffer 压缩后的二进制数据流
  * @returns 解压还原的原始数据
  */
-export function decodeBitpack(buffer: Uint8Array): Uint8Array {
+export function decodeBitpack(buffer: Uint8Array, logs?: CompressionLog[]): Uint8Array {
   const reader = new BitReader(buffer);
-  const output: number[] = [];
+  const output = new DynamicUint8Array();
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Decoding Bitpack', message: `Starting decode bitpack...` });
+  let matchCount = 0;
+  let literalCount = 0;
 
   while (true) {
     const flag = reader.readBit();
@@ -30,6 +35,7 @@ export function decodeBitpack(buffer: Uint8Array): Uint8Array {
       const value = reader.readBits(8);
       if (value === null) break;
       output.push(value);
+      literalCount++;
     } else {
       const distance = reader.readBits(12);
       if (distance === null) break;
@@ -39,37 +45,38 @@ export function decodeBitpack(buffer: Uint8Array): Uint8Array {
       if (distance === 0) break;
 
       const startIdx = output.length - distance;
-      for (let i = 0; i < length; i++) {
-        output.push(output[startIdx + i]);
+      output.copy(startIdx, length);
+      matchCount++;
+      if (logs && matchCount <= 5) {
+        logs.push({ timestamp: performance.now(), phase: 'LZ77 Decode', message: `Applied match: distance=${distance}, length=${length}` });
       }
     }
   }
-  return new Uint8Array(output);
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Decoding Complete', message: `Decompression finished. Matches: ${matchCount}, Literals: ${literalCount}` });
+  return output.getArray();
 }
 
 /**
  * 解码器 2：动态 Huffman 解码 (对应原 Huffman-1.ts)
- * 
- * 机制：
- * 1. 先从数据流前端反序列化读取出单一的一棵哈夫曼树。
- * 2. 依据树逐 bit 解码。
- *    - 解出的符号 < 256 为字面量。
- *    - 符号 === 256 为 EOF。
- *    - 符号 > 256 为匹配长度，此时需要再固定读取 12 bits 作为距离。
- * 
- * @param buffer 压缩后的二进制数据流
- * @returns 解压还原的原始数据
  */
-export function decodeHuffmanDynamic(buffer: Uint8Array): Uint8Array {
+export function decodeHuffmanDynamic(buffer: Uint8Array, logs?: CompressionLog[]): Uint8Array {
   if (buffer.length === 0) return new Uint8Array(0);
 
   const reader = new BitReader(buffer);
   
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Decoding Dynamic Huffman', message: `Starting dynamic Huffman decoding...` });
+
   // 1. 读取 Huffman 树
   const root = readHuffmanTreeDynamic(reader);
   if (!root) return new Uint8Array(0);
 
-  const output: number[] = [];
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Huffman Tree Reconstructed', message: `Dynamic Huffman tree read successfully` });
+
+  const output = new DynamicUint8Array();
+
+  let matchCount = 0;
+  let literalCount = 0;
 
   // 2. 解码数据
   while (true) {
@@ -92,6 +99,7 @@ export function decodeHuffmanDynamic(buffer: Uint8Array): Uint8Array {
     if (symbol < 256) {
       // Literal
       output.push(symbol);
+      literalCount++;
     } else {
       // Match length
       const length = symbol - 257 + MIN_MATCH_LENGTH;
@@ -99,38 +107,33 @@ export function decodeHuffmanDynamic(buffer: Uint8Array): Uint8Array {
       if (distance === null) break;
 
       const startIdx = output.length - distance;
-      for (let i = 0; i < length; i++) {
-        output.push(output[startIdx + i]);
+      output.copy(startIdx, length);
+      matchCount++;
+      if (logs && matchCount <= 5) {
+        logs.push({ timestamp: performance.now(), phase: 'LZ77 Decode', message: `Applied match: distance=${distance}, length=${length}` });
       }
     }
   }
 
-  return new Uint8Array(output);
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Decoding Complete', message: `Decompression finished. Matches: ${matchCount}, Literals: ${literalCount}` });
+  return output.getArray();
 }
 
 /**
  * 解码器 3：Deflate 风格的双 Huffman 树解码 (对应原 Huffman.ts, Huffman-2.ts)
- * 
- * 机制：
- * 1. 从数据流前端先后反序列化读取 Literal/Length 树 和 Distance 树。
- * 2. 依据 LL 树解出符号：
- *    - 若为字面量 (< 256)，直接输出。
- *    - 若为 EOF (256)，结束。
- *    - 若为匹配长度 Code (> 256)，根据规范读取对应数量的 Extra Bits 补全真实长度。
- * 3. 接着再依据 Distance 树解出距离 Code，同样读取 Extra Bits 补全真实距离。
- * 4. 根据解出的真实长度和距离，去输出流历史中拷贝数据。
- * 
- * @param buffer 压缩后的二进制数据流
- * @returns 解压还原的原始数据
  */
-export function decodeHuffmanDeflate(buffer: Uint8Array): Uint8Array {
+export function decodeHuffmanDeflate(buffer: Uint8Array, logs?: CompressionLog[]): Uint8Array {
   const reader = new BitReader(buffer);
-  const output: number[] = [];
+  const output = new DynamicUint8Array();
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Decoding Deflate Huffman', message: `Starting dual trees deflate decoding...` });
 
   const llRoot = deserializeTreeDeflate(reader, 9);
   const distRoot = deserializeTreeDeflate(reader, 5);
 
   if (!llRoot || !distRoot) return new Uint8Array(0);
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Dual Trees Reconstructed', message: `LL tree and Distance tree successfully read` });
 
   function readSymbol(root: HuffmanNodeDeflate): number | null {
     let node = root;
@@ -142,6 +145,9 @@ export function decodeHuffmanDeflate(buffer: Uint8Array): Uint8Array {
     return node.symbol;
   }
 
+  let matchCount = 0;
+  let literalCount = 0;
+
   while (true) {
     const symbol = readSymbol(llRoot);
     if (symbol === null) break;
@@ -152,6 +158,7 @@ export function decodeHuffmanDeflate(buffer: Uint8Array): Uint8Array {
 
     if (symbol < 256) {
       output.push(symbol);
+      literalCount++;
     } else {
       const lenBaseInfo = getLengthBase(symbol);
       let length = lenBaseInfo.base;
@@ -173,11 +180,14 @@ export function decodeHuffmanDeflate(buffer: Uint8Array): Uint8Array {
       }
 
       const startIdx = output.length - distance;
-      for (let i = 0; i < length; i++) {
-        output.push(output[startIdx + i]);
+      output.copy(startIdx, length);
+      matchCount++;
+      if (logs && matchCount <= 5) {
+        logs.push({ timestamp: performance.now(), phase: 'LZ77 Decode', message: `Applied match: distance=${distance}, length=${length}` });
       }
     }
   }
 
-  return new Uint8Array(output);
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Decoding Complete', message: `Decompression finished. Matches: ${matchCount}, Literals: ${literalCount}` });
+  return output.getArray();
 }

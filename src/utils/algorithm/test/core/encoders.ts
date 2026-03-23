@@ -5,20 +5,15 @@ import {
   buildHuffmanTreeDeflate, serializeTreeDeflate,
   HuffmanNodeDynamic, writeHuffmanTreeDynamic
 } from './huffman-utils';
+import { CompressionLog } from '../../../../types';
 
 /**
  * 编码器 1：简单的 Bitpacking 编码 (对应原 LZ77.ts, LZ77-1.ts, LZ77-2.ts)
- * 
- * 机制：
- * 不使用哈夫曼树，而是使用固定的位数直接将 Token 写入流中。
- * - 字面量：标志位(1 bit, 值为0) + 字符(8 bits)
- * - 匹配对：标志位(1 bit, 值为1) + 距离(12 bits) + 长度(8 bits)
- * 
- * @param tokens LZ77 匹配阶段输出的 Token 数组
- * @returns 编码后的二进制数据流
  */
-export function encodeBitpack(tokens: Token[]): Uint8Array {
+export function encodeBitpack(tokens: Token[], logs?: CompressionLog[]): Uint8Array {
   const writer = new BitWriter();
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Encoding Bitpack', message: `Encoding ${tokens.length} tokens` });
 
   for (const token of tokens) {
     if (token.type === 'literal') {
@@ -36,22 +31,18 @@ export function encodeBitpack(tokens: Token[]): Uint8Array {
   writer.writeBits(0, 12);
   writer.writeBits(0, 8);
 
-  return writer.flush();
+  const res = writer.flush();
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Encoding Bitpack Complete', message: `Encoded size: ${res.length} bytes` });
+  return res;
 }
 
 /**
  * 编码器 2：动态 Huffman 编码 (对应原 Huffman-1.ts)
- * 
- * 机制：
- * 仅对 `字面量` 和 `匹配长度` 构建一棵统一的哈夫曼树进行变长编码，
- * 而 `Distance`（距离）部分依然采用固定的 12 bits。
- * 符号映射：0-255 表示字面量，256 表示 EOF，257-511 表示匹配长度。
- * 
- * @param tokens LZ77 匹配阶段输出的 Token 数组
- * @returns 编码后的二进制数据流
  */
-export function encodeHuffmanDynamic(tokens: Token[]): Uint8Array {
+export function encodeHuffmanDynamic(tokens: Token[], logs?: CompressionLog[]): Uint8Array {
   if (tokens.length === 0) return new Uint8Array(0);
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Encoding Dynamic Huffman', message: `Building dynamic Huffman tree for ${tokens.length} tokens` });
 
   // 1. 统计频率
   // 符号映射: 0-255(字面量), 256(EOF), 257-511(匹配长度: 257代表长度3)
@@ -85,7 +76,6 @@ export function encodeHuffmanDynamic(tokens: Token[]): Uint8Array {
   }
   const root = nodes[0];
 
-  // 3. 生成编码表
   const codes: { [key: number]: { code: number, len: number } } = {};
   const buildCodes = (node: HuffmanNodeDynamic | null, code: number, length: number) => {
     if (!node) return;
@@ -97,6 +87,50 @@ export function encodeHuffmanDynamic(tokens: Token[]): Uint8Array {
     buildCodes(node.right, (code << 1) | 1, length + 1);
   };
   buildCodes(root, 0, 0);
+
+  if (logs) {
+    // 收集一些频率最高的字符用于展示
+    const topFreqs = Array.from(freqs)
+      .map((f, i) => ({ symbol: i, freq: f }))
+      .filter(x => x.freq > 0)
+      .sort((a, b) => b.freq - a.freq)
+      .slice(0, 10);
+      
+    // 收集一些编码示例
+    const sampleCodes = topFreqs.map(x => {
+      let symbolDesc = x.symbol.toString();
+      if (x.symbol < 256) {
+        if (x.symbol >= 32 && x.symbol <= 126) {
+          symbolDesc = `'${String.fromCharCode(x.symbol)}' (${x.symbol})`;
+        } else {
+          symbolDesc = `byte(${x.symbol})`;
+        }
+      } else if (x.symbol === 256) {
+        symbolDesc = 'EOF (256)';
+      } else {
+        symbolDesc = `MatchLen ${x.symbol - 257 + MIN_MATCH_LENGTH} (${x.symbol})`;
+      }
+      
+      const codeInfo = codes[x.symbol];
+      return {
+        symbol: symbolDesc,
+        freq: x.freq,
+        bitLength: codeInfo.len,
+        codeStr: codeInfo.code.toString(2).padStart(codeInfo.len, '0')
+      };
+    });
+    
+    logs.push({ 
+      timestamp: performance.now(), 
+      phase: 'Huffman Tree Built', 
+      message: `哈希树构建完成，包含 ${Object.keys(codes).length} 个不同符号，根节点权重: ${root.freq}`,
+      details: {
+        uniqueSymbols: Object.keys(codes).length,
+        rootWeight: root.freq,
+        topSymbols: sampleCodes
+      }
+    });
+  }
 
   const writer = new BitWriter();
 
@@ -121,23 +155,18 @@ export function encodeHuffmanDynamic(tokens: Token[]): Uint8Array {
   const eofHuff = codes[256];
   writer.writeBits(eofHuff.code, eofHuff.len);
 
-  return writer.flush();
+  const res = writer.flush();
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Encoding Complete', message: `Final size: ${res.length} bytes` });
+  return res;
 }
 
 /**
  * 编码器 3：Deflate 风格的双 Huffman 树编码 (对应原 Huffman.ts, Huffman-2.ts)
- * 
- * 机制：
- * 遵循类似标准 Deflate 的做法，构建两棵哈夫曼树：
- * 1. Literal/Length 树：负责编码 字面量 和 匹配长度的基础 Code。
- * 2. Distance 树：负责编码 匹配距离的基础 Code。
- * 超出基础 Code 范围的部分，通过 Extra Bits 的形式固定写入流中。
- * 
- * @param tokens LZ77 匹配阶段输出的 Token 数组
- * @returns 编码后的二进制数据流
  */
-export function encodeHuffmanDeflate(tokens: Token[]): Uint8Array {
+export function encodeHuffmanDeflate(tokens: Token[], logs?: CompressionLog[]): Uint8Array {
   const writer = new BitWriter();
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Encoding Deflate Huffman', message: `Building dual trees for ${tokens.length} tokens` });
 
   const llFreq = new Array(286).fill(0);
   const distFreq = new Array(30).fill(0);
@@ -157,6 +186,8 @@ export function encodeHuffmanDeflate(tokens: Token[]): Uint8Array {
 
   const llTree = buildHuffmanTreeDeflate(llFreq);
   const distTree = buildHuffmanTreeDeflate(distFreq);
+
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Dual Trees Built', message: `LL tree and Distance tree successfully built` });
 
   serializeTreeDeflate(llTree.root, writer, 9); // Max LL symbol 285 (9 bits)
   serializeTreeDeflate(distTree.root, writer, 5); // Max Dist symbol 29 (5 bits)
@@ -185,5 +216,7 @@ export function encodeHuffmanDeflate(tokens: Token[]): Uint8Array {
   const eofInfo = llTree.codes.get(256)!;
   writer.writeBits(eofInfo.code, eofInfo.bitLen);
 
-  return writer.flush();
+  const res = writer.flush();
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'Encoding Complete', message: `Final size: ${res.length} bytes` });
+  return res;
 }

@@ -56,6 +56,8 @@ const App: React.FC = () => {
     }
   });
 
+  const [collectLogs, setCollectLogs] = useState<boolean>(true);
+
   const [originalFileName, setOriginalFileName] = useState<string>('data');
 
   // Update local storage when state changes
@@ -100,7 +102,8 @@ const App: React.FC = () => {
     setTestPayload({
       data,
       executionCount,
-      triggerId: Date.now()
+      triggerId: Date.now(),
+      collectLogs
     });
 
     // 稍微延迟关闭 loading，或者直接关闭，因为卡片内部有自己的 loading
@@ -171,6 +174,8 @@ const App: React.FC = () => {
             setAlgorithms={setAlgorithms}
             executionCount={executionCount}
             setExecutionCount={setExecutionCount}
+            collectLogs={collectLogs}
+            setCollectLogs={setCollectLogs}
             loading={loading}
             onRunTest={handleRunTest}
           />

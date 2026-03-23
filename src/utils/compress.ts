@@ -3,54 +3,68 @@ import LZString from 'lz-string';
 import { myZipCompress, myZipDecompress } from './algorithm/myzip';
 import { myLZ77Compress, myLZ77Decompress, myLZ771Compress, myLZ771Decompress, myHuffmanCompress, myHuffmanDecompress, myHuffman1Compress, myHuffman1Decompress, myLZ772Compress, myLZ772Decompress, myHuffman2Compress, myHuffman2Decompress } from './algorithm/test';
 import { CompressionAlgorithm } from '../common';
+import { CompressionLog } from '../types';
 
 export interface CompressionResult {
   compressedData: Uint8Array;
   decompressedData: Uint8Array;
 }
 
-const compressors: Record<string, (data: Uint8Array) => Uint8Array | Promise<Uint8Array>> = {
+export interface DetailedCompressionResult {
+  data: Uint8Array;
+  logs?: CompressionLog[];
+}
+
+const compressors: Record<string, (data: Uint8Array, collectLogs?: boolean) => Uint8Array | Promise<Uint8Array> | DetailedCompressionResult> = {
   [CompressionAlgorithm.Pako]: (data) => pako.deflate(data),
   [CompressionAlgorithm.LZString]: (data) => {
     const str = new TextDecoder().decode(data);
     return LZString.compressToUint8Array(str);
   },
-  [CompressionAlgorithm.MyZip]: myZipCompress,
-  [CompressionAlgorithm.LZ77]: myLZ77Compress,
-  [CompressionAlgorithm.LZ771]: myLZ771Compress,
-  [CompressionAlgorithm.LZ772]: myLZ772Compress,
-  [CompressionAlgorithm.Huffman]: myHuffmanCompress,
-  [CompressionAlgorithm.Huffman1]: myHuffman1Compress,
-  [CompressionAlgorithm.Huffman2]: myHuffman2Compress,
+  [CompressionAlgorithm.MyZip]: (data, collectLogs = false) => myZipCompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ77]: (data, collectLogs = false) => myLZ77Compress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ771]: (data, collectLogs = false) => myLZ771Compress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ772]: (data, collectLogs = false) => myLZ772Compress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.Huffman]: (data, collectLogs = false) => myHuffmanCompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.Huffman1]: (data, collectLogs = false) => myHuffman1Compress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.Huffman2]: (data, collectLogs = false) => myHuffman2Compress(data, collectLogs) as DetailedCompressionResult,
 };
 
-const deCompressors: Record<string, (data: Uint8Array) => Uint8Array | Promise<Uint8Array>> = {
+const deCompressors: Record<string, (data: Uint8Array, collectLogs?: boolean) => Uint8Array | Promise<Uint8Array> | DetailedCompressionResult> = {
   [CompressionAlgorithm.Pako]: (data) => pako.inflate(data),
   [CompressionAlgorithm.LZString]: (data) => {
     const decompressedStr = LZString.decompressFromUint8Array(data);
     return new TextEncoder().encode(decompressedStr);
   },
-  [CompressionAlgorithm.MyZip]: myZipDecompress,
-  [CompressionAlgorithm.LZ77]: myLZ77Decompress,
-  [CompressionAlgorithm.LZ771]: myLZ771Decompress,
-  [CompressionAlgorithm.LZ772]: myLZ772Decompress,
-  [CompressionAlgorithm.Huffman]: myHuffmanDecompress,
-  [CompressionAlgorithm.Huffman1]: myHuffman1Decompress,
-  [CompressionAlgorithm.Huffman2]: myHuffman2Decompress,
+  [CompressionAlgorithm.MyZip]: (data, collectLogs = false) => myZipDecompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ77]: (data, collectLogs = false) => myLZ77Decompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ771]: (data, collectLogs = false) => myLZ771Decompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ772]: (data, collectLogs = false) => myLZ772Decompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.Huffman]: (data, collectLogs = false) => myHuffmanDecompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.Huffman1]: (data, collectLogs = false) => myHuffman1Decompress(data, collectLogs) as DetailedCompressionResult,
+  [CompressionAlgorithm.Huffman2]: (data, collectLogs = false) => myHuffman2Decompress(data, collectLogs) as DetailedCompressionResult,
 };
 
-export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
+export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm, collectLogs: boolean = false): Promise<DetailedCompressionResult> => {
   const compressor = compressors[algorithm];
   if (!compressor) {
     throw new Error(`Unsupported algorithm: ${algorithm}`);
   }
-  return compressor(data);
+  const result = await compressor(data, collectLogs);
+  if (result instanceof Uint8Array) {
+    return { data: result };
+  }
+  return result;
 };
 
-export const decompressData = async (compressedData: Uint8Array, algorithm: CompressionAlgorithm): Promise<Uint8Array> => {
+export const decompressData = async (compressedData: Uint8Array, algorithm: CompressionAlgorithm, collectLogs: boolean = false): Promise<DetailedCompressionResult> => {
   const decompressor = deCompressors[algorithm];
   if (!decompressor) {
     throw new Error(`Unsupported algorithm: ${algorithm}`);
   }
-  return decompressor(compressedData);
+  const result = await decompressor(compressedData, collectLogs);
+  if (result instanceof Uint8Array) {
+    return { data: result };
+  }
+  return result;
 };

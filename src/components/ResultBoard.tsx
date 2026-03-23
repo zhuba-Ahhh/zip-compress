@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Row, Col, Card, Descriptions, Typography, Tag, Space, Button, Spin, Tooltip } from 'antd';
-import { DownloadOutlined, SyncOutlined } from '@ant-design/icons';
-import { Stats } from '../types';
+import { Row, Col, Card, Descriptions, Typography, Tag, Space, Button, Spin, Tooltip, Modal, Timeline } from 'antd';
+import { DownloadOutlined, SyncOutlined, FileTextOutlined } from '@ant-design/icons';
+import { Stats, CompressionLog } from '../types';
 import { formatSize, downloadFile, compressData, decompressData } from '../utils';
 import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
 
@@ -11,6 +11,7 @@ export interface TestPayload {
   data: Uint8Array;
   executionCount: number;
   triggerId: number;
+  collectLogs: boolean;
 }
 
 interface AlgorithmCardProps {
@@ -21,6 +22,7 @@ interface AlgorithmCardProps {
 
 const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, originalFileName }) => {
   const [stats, setStats] = useState<Stats | null>(null);
+  const [isLogModalVisible, setIsLogModalVisible] = useState(false);
 
   useEffect(() => {
     let isCancelled = false;
@@ -50,31 +52,40 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
         let finalCompressedData: Uint8Array = new Uint8Array();
         let finalDecompressedData: Uint8Array = new Uint8Array();
         let finalIsMatch = false;
+        let finalLogs: CompressionLog[] | undefined = undefined;
 
         for (let iter = 0; iter < payload.executionCount; iter++) {
           if (isCancelled) return;
 
           // 1. Compress
           const startCompress = performance.now();
-          const compressedData = await compressData(payload.data, algorithm);
+          const compressRes = await compressData(payload.data, algorithm, payload.collectLogs);
           const endCompress = performance.now();
           totalCompressTime += (endCompress - startCompress);
 
           // 2. Decompress
           const startDecompress = performance.now();
-          const decompressedData = await decompressData(compressedData, algorithm);
+          const decompressRes = await decompressData(compressRes.data, algorithm, payload.collectLogs);
           const endDecompress = performance.now();
           totalDecompressTime += (endDecompress - startDecompress);
 
           if (iter === payload.executionCount - 1) {
-            finalCompressedData = compressedData;
-            finalDecompressedData = decompressedData;
+            finalCompressedData = compressRes.data;
+            finalDecompressedData = decompressRes.data;
+
+            // 合并日志
+            if (compressRes.logs || decompressRes.logs) {
+              finalLogs = [
+                ...(compressRes.logs || []).map(l => ({ ...l, phase: `[压缩] ${l.phase}` })),
+                ...(decompressRes.logs || []).map(l => ({ ...l, phase: `[解压] ${l.phase}` }))
+              ];
+            }
 
             // 3. Verify on last iteration
-            finalIsMatch = payload.data.length === decompressedData.length;
+            finalIsMatch = payload.data.length === finalDecompressedData.length;
             if (finalIsMatch) {
               for (let i = 0; i < payload.data.length; i++) {
-                if (payload.data[i] !== decompressedData[i]) {
+                if (payload.data[i] !== finalDecompressedData[i]) {
                   finalIsMatch = false;
                   break;
                 }
@@ -105,6 +116,7 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
           compressedData: finalCompressedData,
           decompressedData: finalDecompressedData,
           loading: false,
+          logs: finalLogs,
         });
 
       } catch (err: unknown) {
@@ -138,23 +150,101 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
 
   const algorithmName = ALGORITHM_OPTIONS.find(item => item.value === stats.algorithm);
 
+  const renderLogModal = () => (
+    <Modal
+      title={`${algorithmName?.description || stats.algorithm} 执行日志`}
+      open={isLogModalVisible}
+      onCancel={() => setIsLogModalVisible(false)}
+      footer={null}
+      width={900}
+      bodyStyle={{ maxHeight: '70vh', overflowY: 'auto' }}
+    >
+      {stats.logs && stats.logs.length > 0 ? (
+        <Timeline
+          items={stats.logs.map((log, index) => ({
+            color: log.phase.includes('[压缩]') ? 'blue' : 'green',
+            children: (
+              <div>
+                <Text strong>{log.phase}</Text> <Text type="secondary" style={{ fontSize: '12px' }}>+{index === 0 ? 0 : (log.timestamp - stats.logs![0].timestamp).toFixed(2)}ms</Text>
+                <div style={{ marginTop: 4 }}>{log.message}</div>
+                {log.details && (
+                  <div style={{
+                    fontSize: '12px',
+                    background: '#f5f5f5',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    marginTop: '8px',
+                    border: '1px solid #e8e8e8',
+                    overflowX: 'auto'
+                  }}>
+                    {log.details.matchedString && (
+                      <div style={{ marginBottom: '4px' }}>
+                        <Text type="secondary">匹配文本: </Text>
+                        <Text code style={{ color: '#eb2f96' }}>{log.details.matchedString}</Text>
+                      </div>
+                    )}
+                    {log.details.topSymbols && (
+                      <div style={{ marginBottom: '8px' }}>
+                        <Text type="secondary" strong>频率最高的字符及编码:</Text>
+                        <ul style={{ margin: '4px 0 0 0', paddingLeft: '20px' }}>
+                          {log.details.topSymbols.map((s: { symbol: string, freq: number, codeStr: string, bitLength: number }, i: number) => (
+                            <li key={i}>
+                              <Text code>{s.symbol}</Text> : 频率 {s.freq}, 编码 <Text code style={{ color: '#1890ff' }}>{s.codeStr}</Text> ({s.bitLength} bits)
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {/* 其他通用对象的渲染 */}
+                    {Object.entries(log.details).filter(([key]) => !['matchedString', 'topSymbols'].includes(key)).length > 0 && (
+                      <pre style={{ margin: 0, fontFamily: 'Consolas, monospace', whiteSpace: 'pre-wrap' }}>
+                        {JSON.stringify(
+                          Object.fromEntries(Object.entries(log.details).filter(([key]) => !['matchedString', 'topSymbols'].includes(key))),
+                          null,
+                          2
+                        )}
+                      </pre>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          }))}
+        />
+      ) : (
+        <div style={{ textAlign: 'center', padding: '20px' }}>
+          当前算法暂无详细日志输出。
+        </div>
+      )}
+    </Modal>
+  );
+
   return (
+    <>
     <Card
       type="inner"
-      title={
-        <>
-          <Tooltip title={algorithmName?.description || ''}>
+        title={
+        <Tooltip title={algorithmName?.description || ''}>
             <Tag color="processing">
               {stats.algorithm}
             </Tag>
-          </Tooltip>
-          处理详情
-        </>
+        </Tooltip>
       }
       style={{ background: '#fafafa', height: '100%' }}
       extra={
         !stats.loading && stats.compressedData && !stats.error && (
           <Space>
+            {stats.logs && (
+              <Button
+                size="small"
+                type="primary"
+                ghost
+                icon={<FileTextOutlined />}
+                onClick={() => setIsLogModalVisible(true)}
+              >
+                查看日志
+              </Button>
+            )}
             <Button
               size="small"
               type="dashed"
@@ -212,6 +302,8 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
         </Descriptions>
       )}
     </Card>
+      {renderLogModal()}
+    </>
   );
 };
 

@@ -8,11 +8,24 @@
  */
 export class BitWriter {
   // 存储最终生成的字节数组
-  private bytes: number[] = [];
+  private buffer: Uint8Array;
+  private bytePos: number = 0;
   // 当前正在拼装的字节缓存
   private currentByte: number = 0;
   // 当前正在拼装的字节已写入了多少个 bit (0~7)
   private bitPos: number = 0;
+
+  constructor(initialCapacity: number = 1024 * 1024) {
+    this.buffer = new Uint8Array(initialCapacity);
+  }
+
+  private ensureCapacity() {
+    if (this.bytePos >= this.buffer.length) {
+      const newBuffer = new Uint8Array(this.buffer.length * 2);
+      newBuffer.set(this.buffer);
+      this.buffer = newBuffer;
+    }
+  }
 
   /**
    * 写入单个 bit
@@ -25,7 +38,8 @@ export class BitWriter {
 
     // 当凑满 8 个 bit 时，代表一个完整的字节拼装完成
     if (this.bitPos === 8) {
-      this.bytes.push(this.currentByte);
+      if (this.bytePos >= this.buffer.length) this.ensureCapacity();
+      this.buffer[this.bytePos++] = this.currentByte;
       this.currentByte = 0;
       this.bitPos = 0;
     }
@@ -55,10 +69,11 @@ export class BitWriter {
       // 假设当前写入了 3 个 bit (如 101)，还差 5 个位才满一个字节
       // 则需要左移 5 位，变成 10100000 存入
       this.currentByte <<= (8 - this.bitPos);
-      this.bytes.push(this.currentByte);
+      if (this.bytePos >= this.buffer.length) this.ensureCapacity();
+      this.buffer[this.bytePos++] = this.currentByte;
       this.bitPos = 0;
     }
-    return new Uint8Array(this.bytes);
+    return this.buffer.slice(0, this.bytePos);
   }
 }
 
@@ -118,5 +133,49 @@ export class BitReader {
       value = (value << 1) | bit;
     }
     return value;
+  }
+}
+
+/**
+ * 动态扩容的 Uint8Array 缓冲区，用于解压过程中的数据写入
+ */
+export class DynamicUint8Array {
+  private buffer: Uint8Array;
+  public length: number = 0;
+
+  constructor(initialCapacity: number = 1024 * 1024) {
+    this.buffer = new Uint8Array(initialCapacity);
+  }
+
+  private ensureCapacity(requiredElements: number) {
+    if (this.length + requiredElements <= this.buffer.length) return;
+    let newCap = this.buffer.length * 2;
+    while (this.length + requiredElements > newCap) {
+      newCap *= 2;
+    }
+    const newBuffer = new Uint8Array(newCap);
+    newBuffer.set(this.buffer);
+    this.buffer = newBuffer;
+  }
+
+  push(value: number) {
+    this.ensureCapacity(1);
+    this.buffer[this.length++] = value;
+  }
+
+  copy(startIdx: number, copyLen: number) {
+    this.ensureCapacity(copyLen);
+    if (startIdx + copyLen <= this.length) {
+      this.buffer.copyWithin(this.length, startIdx, startIdx + copyLen);
+      this.length += copyLen;
+    } else {
+      for (let i = 0; i < copyLen; i++) {
+        this.buffer[this.length++] = this.buffer[startIdx + i];
+      }
+    }
+  }
+
+  getArray(): Uint8Array {
+    return this.buffer.slice(0, this.length);
   }
 }
