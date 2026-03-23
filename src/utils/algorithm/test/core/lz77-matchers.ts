@@ -24,7 +24,7 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
   const tokens: Token[] = [];
   let cursor = 0;
   
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Simple', message: 'Starting brute-force LZ77 matching...' });
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77匹配', message: '开始基础版暴力匹配' });
 
   let matchCount = 0;
   let literalCount = 0;
@@ -57,7 +57,7 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
         
         logs.push({ 
           timestamp: performance.now(), 
-          phase: 'LZ77 Simple Match', 
+          phase: 'LZ77匹配 (暴力)', 
           message: `找到匹配: 距离=${bestMatchDist}, 长度=${bestMatchLen}`,
           details: {
             cursor,
@@ -79,7 +79,7 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Simple Finished', message: `Completed. Found ${matchCount} matches and ${literalCount} literals.` });
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77完成', message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。` });
   return tokens;
 }
 
@@ -91,7 +91,7 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
   const len = buffer.length;
   let cursor = 0;
   
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 HashChain', message: 'Starting Hash Chain LZ77 matching...' });
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77匹配', message: '开始哈希链表匹配' });
 
   const head = new Int32Array(HASH_MASK + 1).fill(-1);
   const prev = new Int32Array(len).fill(-1);
@@ -144,7 +144,7 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
         
         logs.push({ 
           timestamp: performance.now(), 
-          phase: 'LZ77 HashChain Match', 
+          phase: 'LZ77匹配 (哈希链表)', 
           message: `找到匹配: 距离=${bestMatchDist}, 长度=${bestMatchLen}`,
           details: {
             cursor,
@@ -171,7 +171,7 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 HashChain Finished', message: `Completed. Found ${matchCount} matches and ${literalCount} literals.` });
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77完成', message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。` });
   return tokens;
 }
 
@@ -182,7 +182,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
   const tokens: Token[] = [];
   let cursor = 0;
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Optimized', message: 'Starting Optimized Hash Chain LZ77 matching...' });
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77匹配', message: '开始环形数组哈希链表匹配' });
 
   const head = new Int32Array(HASH_SIZE_2).fill(-1);
   const prev = new Int32Array(WINDOW_SIZE + 1).fill(-1);
@@ -236,7 +236,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
         
         logs.push({ 
           timestamp: performance.now(), 
-          phase: 'LZ77 Optimized Match', 
+          phase: 'LZ77匹配 (环形哈希)', 
           message: `找到匹配: 距离=${bestMatchDist}, 长度=${bestMatchLen}`,
           details: {
             cursor,
@@ -266,6 +266,6 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77 Optimized Finished', message: `Completed. Found ${matchCount} matches and ${literalCount} literals.` });
+  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77完成', message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。` });
   return tokens;
 }

@@ -33,7 +33,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
     return collectLogs ? { data: emptyResult, logs } : emptyResult;
   }
 
-  addLog('Init', `Starting compression for ${len} bytes`);
+  addLog('初始化', `开始压缩，共 ${len} 字节`);
 
   const writer = new BitWriter(Math.max(len + 16, 1024));
   writer.writeBits(len, 32);
@@ -95,7 +95,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
 
   const freqs = new Int32Array(256).fill(0);
 
-  addLog('LZ77', 'Starting LZ77 matching pass');
+  addLog('LZ77匹配', '开始执行 LZ77 匹配过程');
 
   while (cursor < len) {
     insertString(cursor);
@@ -113,7 +113,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
         freqs[buffer[cursor]]++;
         
         if (collectLogs && literalCount < 5) {
-          addLog('LZ77 Lazy Match', `触发惰性匹配: 在位置 ${cursor} 放弃长度 ${match.len} 的匹配，因下一位置有长度 ${nextMatch.len} 的更优匹配`, {
+          addLog('LZ77惰性匹配', `触发惰性匹配: 在位置 ${cursor} 放弃长度 ${match.len} 的匹配，因下一位置有长度 ${nextMatch.len} 的更优匹配`, {
             cursor,
             currentMatch: match,
             nextMatch: nextMatch,
@@ -136,7 +136,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
       cursor++;
       matchCount++;
       if (collectLogs && matchCount <= 5) {
-        addLog('LZ77 Match', `Found match: distance=${match.dist}, length=${match.len} at pos=${cursor - match.len}`);
+        addLog('LZ77匹配', `找到匹配: 距离=${match.dist}, 长度=${match.len}, 位置=${cursor - match.len}`);
       }
     } else {
       tokens.push(buffer[cursor]);
@@ -146,7 +146,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
     }
   }
 
-  addLog('LZ77 Finished', `LZ77 pass completed. Found ${matchCount} matches and ${literalCount} literals.`);
+  addLog('LZ77完成', `LZ77 匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`);
 
   const nodes: HuffmanNode[] = [];
   for (let i = 0; i < 256; i++) {
@@ -170,7 +170,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   }
   const root = nodes[0];
 
-  addLog('Huffman', 'Huffman tree built successfully', { rootNodesWeight: root.freq });
+  addLog('Huffman建树', 'Huffman 树构建成功', { rootNodesWeight: root.freq });
 
   const huffmanCodes: { [key: number]: { code: number, len: number } } = {};
 
@@ -208,10 +208,10 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
     }
   }
 
-  addLog('Estimation', `Expected bits: ${expectedBits}, Original bits: ${len * 8}`);
+  addLog('容量预估', `预期压缩后位数: ${expectedBits}, 原始位数: ${len * 8}`);
 
   if (expectedBits >= len * 8) {
-    addLog('Fallback', 'Compression ineffective. Storing raw data.');
+    addLog('回退机制', '压缩效果不佳，回退为存储原始数据。');
     writer.writeBit(0);
     writer.writeBytes(buffer);
     const resultData = writer.flush();
@@ -224,7 +224,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
     writer.writeGamma(freqs[i] + 1);
   }
 
-  addLog('Encoding', 'Writing tokens to bit stream...');
+  addLog('编码写入', '正在将 Token 写入位流...');
 
   for (const token of tokens) {
     if (token >= 0) {
@@ -242,7 +242,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
   }
 
   const resultData = writer.flush();
-  addLog('Complete', `Compression completed. Final size: ${resultData.length} bytes`);
+  addLog('压缩完成', `压缩结束。最终大小: ${resultData.length} 字节`);
   return collectLogs ? { data: resultData, logs } : resultData;
 }
 
@@ -256,7 +256,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
     }
   };
 
-  addLog('Init', `Starting decompression for ${buffer.length} bytes`);
+  addLog('初始化', `开始解压，输入大小 ${buffer.length} 字节`);
 
   const expectedLength = reader.readBits(32);
   if (expectedLength === null) {
@@ -268,7 +268,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
     return collectLogs ? { data: res, logs } : res;
   }
 
-  addLog('Header', `Expected decompressed size: ${expectedLength} bytes`);
+  addLog('解析头部', `预期解压后大小: ${expectedLength} 字节`);
 
   const isCompressed = reader.readBit();
   if (isCompressed === null) {
@@ -277,7 +277,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
   }
 
   if (isCompressed === 0) {
-    addLog('Decoding', 'Data is stored as raw bytes.');
+    addLog('解码', '数据以原始字节存储，直接提取。');
     const raw = reader.readBytes(expectedLength);
     const res = raw || new Uint8Array(0);
     return collectLogs ? { data: res, logs } : res;
@@ -313,7 +313,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
   }
   const root = nodes[0];
 
-  addLog('Huffman', 'Huffman tree reconstructed');
+  addLog('Huffman重建', 'Huffman 树重建成功');
 
   const output = new Uint8Array(expectedLength);
   let outPos = 0;
@@ -322,7 +322,7 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
   let matchCount = 0;
   let literalCount = 0;
 
-  addLog('Decoding', 'Decoding bit stream...');
+  addLog('解码', '正在解码位流...');
 
   while (outPos < expectedLength) {
     const flag = reader.readBit();
@@ -365,12 +365,12 @@ export function myZipDecompress(buffer: Uint8Array, collectLogs: boolean = false
       }
       matchCount++;
       if (collectLogs && matchCount <= 5) {
-        addLog('LZ77 Decode', `Applied match: distance=${distance}, length=${length}`);
+        addLog('LZ77解码', `应用匹配: 距离=${distance}, 长度=${length}`);
       }
     }
   }
 
-  addLog('Complete', `Decompression finished. Total matches: ${matchCount}, Total literals: ${literalCount}`);
+  addLog('解压完成', `解压结束。共处理 ${matchCount} 个匹配和 ${literalCount} 个字面量。`);
   
   return collectLogs ? { data: output, logs } : output;
 }

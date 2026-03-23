@@ -105,12 +105,8 @@ const App: React.FC = () => {
       triggerId: Date.now(),
       collectLogs
     });
-
-    // 稍微延迟关闭 loading，或者直接关闭，因为卡片内部有自己的 loading
-    setTimeout(() => {
-      setLoading(false);
-      message.success(`已下发执行任务 (循环 ${executionCount} 次)`);
-    }, 100);
+    
+    message.success(`已下发执行任务 (循环 ${executionCount} 次)`);
   };
 
   const handleRunTest = async () => {
@@ -144,6 +140,10 @@ const App: React.FC = () => {
       reader.readAsArrayBuffer(file);
     }
   };
+
+  useEffect(() => {
+    handleGenerateRandomText();
+  }, []);
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#f5f5f5' }}>
@@ -184,6 +184,7 @@ const App: React.FC = () => {
             algorithms={algorithms}
             payload={testPayload}
             originalFileName={originalFileName}
+            onAllComplete={() => setLoading(false)}
           />
         </Card>
       </Content>
