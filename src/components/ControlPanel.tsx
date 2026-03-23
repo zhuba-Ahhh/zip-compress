@@ -1,36 +1,31 @@
 import React from 'react';
 import { Space, Typography, Select, InputNumber, Button, Switch } from 'antd';
 import { SyncOutlined } from '@ant-design/icons';
-import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
+import { ALGORITHM_OPTIONS } from '@/common';
 import { zhCN } from '@/locales/zh-CN';
+import { useAppContext } from '@/contexts/AppContext';
 
 const { Text } = Typography;
 
 interface ControlPanelProps {
-  algorithms: CompressionAlgorithm[];
-  setAlgorithms: (algos: CompressionAlgorithm[]) => void;
-  executionCount: number;
-  setExecutionCount: (count: number) => void;
-  collectLogs: boolean;
-  setCollectLogs: (collect: boolean) => void;
-  showAdvancedMetrics: boolean;
-  setShowAdvancedMetrics: (show: boolean) => void;
-  loading: boolean;
   onRunTest: () => void;
 }
 
 const ControlPanel: React.FC<ControlPanelProps> = ({
-  algorithms,
-  setAlgorithms,
-  executionCount,
-  setExecutionCount,
-  collectLogs,
-  setCollectLogs,
-  showAdvancedMetrics,
-  setShowAdvancedMetrics,
-  loading,
   onRunTest
 }) => {
+  const {
+    algorithms,
+    setAlgorithms,
+    executionCount,
+    setExecutionCount,
+    collectLogs,
+    setCollectLogs,
+    showAdvancedMetrics,
+    setShowAdvancedMetrics,
+    loading
+  } = useAppContext();
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 24 }}>
       <Space direction="vertical" align="center" size="middle">

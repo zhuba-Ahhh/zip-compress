@@ -1,29 +1,20 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Row, Col, Typography } from 'antd';
 import { Stats } from '@/types';
-import { CompressionAlgorithm } from '@/common';
 import AlgorithmCard from './AlgorithmCard';
 import PerformanceChart, { ChartData } from './PerformanceChart';
 import { zhCN } from '@/locales/zh-CN';
+import { useAppContext } from '@/contexts/AppContext';
 
 const { Title } = Typography;
 
-export interface TestPayload {
-  data: Uint8Array;
-  executionCount: number;
-  triggerId: number;
-  collectLogs: boolean;
-}
+const ResultBoard: React.FC = () => {
+  const {
+    algorithms,
+    testPayload: payload,
+    setLoading
+  } = useAppContext();
 
-export interface ResultBoardProps {
-  algorithms: CompressionAlgorithm[];
-  payload: TestPayload | null;
-  originalFileName: string;
-  showAdvancedMetrics: boolean;
-  onAllComplete?: () => void;
-}
-
-const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, originalFileName, showAdvancedMetrics, onAllComplete }) => {
   const [allStats, setAllStats] = useState<Record<string, Stats>>({});
   const [completedCount, setCompletedCount] = useState(0);
 
@@ -41,9 +32,9 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
 
   useEffect(() => {
     if (payload && completedCount > 0 && completedCount === algorithms.length) {
-      onAllComplete?.();
+      setLoading(false);
     }
-  }, [completedCount, algorithms.length, payload, onAllComplete]);
+  }, [completedCount, algorithms.length, payload, setLoading]);
 
   const chartData: ChartData[] = useMemo(() => {
     if (completedCount === 0) return [];
@@ -81,9 +72,6 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
           <Col xs={24} md={algorithms.length > 1 ? 12 : 24} key={`${algo}-${payload.triggerId}`}>
             <AlgorithmCard
               algorithm={algo}
-              payload={payload}
-              originalFileName={originalFileName}
-              showAdvancedMetrics={showAdvancedMetrics}
               onComplete={handleComplete}
             />
           </Col>

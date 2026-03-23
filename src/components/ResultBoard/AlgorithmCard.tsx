@@ -6,28 +6,28 @@ import { formatSize, downloadFile } from '@/utils';
 import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
 import LogModal from './LogModal';
 import AdvancedMetricsChart from './AdvancedMetricsChart';
-import { TestPayload } from './index';
 // 假设这里引入 worker 进行通讯
 import { zhCN } from '@/locales/zh-CN';
 import { WorkerMessage } from '@/workers/compression.worker';
+import { useAppContext } from '@/contexts/AppContext';
 
 const { Text } = Typography;
 
 export interface AlgorithmCardProps {
   algorithm: CompressionAlgorithm;
-  payload: TestPayload;
-  originalFileName: string;
-  showAdvancedMetrics: boolean;
   onComplete: (stats: Stats) => void;
 }
 
-const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, originalFileName, showAdvancedMetrics, onComplete }) => {
+const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, onComplete }) => {
+  const { testPayload: payload, originalFileName, showAdvancedMetrics } = useAppContext();
+
   const [stats, setStats] = useState<Stats | null>(null);
   const [progress, setProgress] = useState(0);
   const [isLogModalVisible, setIsLogModalVisible] = useState(false);
   const workerRef = useRef<Worker | null>(null);
 
   useEffect(() => {
+    if (!payload) return;
     let isCancelled = false;
 
     const runTest = async () => {
@@ -174,7 +174,7 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, payload, origi
           spinning={stats.loading}
           indicator={<SyncOutlined spin style={{ fontSize: 24, marginBottom: 8 }} />}
           tip={
-            payload.executionCount > 1 ? (
+            payload && payload.executionCount > 1 ? (
               <div style={{ width: '80%', margin: '0 auto', marginTop: 8 }}>
                 <Progress
                   percent={Math.round((progress / payload.executionCount) * 100)}

@@ -4,6 +4,7 @@ import { FileTextOutlined, UploadOutlined, CodeOutlined } from '@ant-design/icon
 import type { UploadFile } from 'antd/es/upload/interface';
 import { MAX_FILE_SIZE_HINT } from '@/common';
 import { zhCN } from '@/locales/zh-CN';
+import { useAppContext } from '@/contexts/AppContext';
 
 const { TextArea } = Input;
 const { Text } = Typography;
@@ -12,30 +13,26 @@ const { Text } = Typography;
 // 1. Text Input Tab (Memoized)
 // ==========================================
 interface TextInputTabProps {
-  textInput: string;
-  setTextInput: (val: string) => void;
-  onClearResults: () => void;
   onGenerateRandomText: () => void;
-  randomLength: number;
-  setRandomLength: (val: number) => void;
-  randomness: number;
-  setRandomness: (val: number) => void;
 }
 
 const TextInputTab = memo<TextInputTabProps>(({
-  textInput,
-  setTextInput,
-  onClearResults,
-  onGenerateRandomText,
-  randomLength,
-  setRandomLength,
-  randomness,
-  setRandomness
+  onGenerateRandomText
 }) => {
+  const {
+    textInput,
+    setTextInput,
+    setTestPayload,
+    randomLength,
+    setRandomLength,
+    randomness,
+    setRandomness
+  } = useAppContext();
+
   const handleClear = useCallback(() => {
     setTextInput('');
-    onClearResults();
-  }, [setTextInput, onClearResults]);
+    setTestPayload(null);
+  }, [setTextInput, setTestPayload]);
 
   const handleLengthChange = useCallback((val: number | null) => {
     setRandomLength(val || 300000);
@@ -96,24 +93,17 @@ const TextInputTab = memo<TextInputTabProps>(({
 // ==========================================
 // 2. File Input Tab (Memoized)
 // ==========================================
-interface FileInputTabProps {
-  fileList: UploadFile[];
-  setFileList: (list: UploadFile[]) => void;
-  onClearResults: () => void;
-}
 
-const FileInputTab = memo<FileInputTabProps>(({
-  fileList,
-  setFileList,
-  onClearResults
-}) => {
+const FileInputTab = memo(() => {
+  const { fileList, setFileList, setTestPayload } = useAppContext();
+
   const handleChange = useCallback(({ fileList: newFileList }: { fileList: UploadFile[] }) => {
     setFileList(newFileList);
   }, [setFileList]);
 
   const handleRemove = useCallback(() => {
-    onClearResults();
-  }, [onClearResults]);
+    setTestPayload(null);
+  }, [setTestPayload]);
 
   return (
     <div style={{ marginTop: 16 }}>
@@ -138,34 +128,14 @@ const FileInputTab = memo<FileInputTabProps>(({
 // 3. Main Panel Component
 // ==========================================
 interface InputPanelProps {
-  activeTab: string;
-  setActiveTab: (key: string) => void;
-  textInput: string;
-  setTextInput: (val: string) => void;
-  fileList: UploadFile[];
-  setFileList: (list: UploadFile[]) => void;
-  onClearResults: () => void;
   onGenerateRandomText: () => void;
-  randomLength: number;
-  setRandomLength: (val: number) => void;
-  randomness: number;
-  setRandomness: (val: number) => void;
 }
 
 const InputPanel: React.FC<InputPanelProps> = ({
-  activeTab,
-  setActiveTab,
-  textInput,
-  setTextInput,
-  fileList,
-  setFileList,
-  onClearResults,
   onGenerateRandomText,
-  randomLength,
-  setRandomLength,
-  randomness,
-  setRandomness
 }) => {
+  const { activeTab, setActiveTab } = useAppContext();
+
   return (
     <Tabs
       activeKey={activeTab}
@@ -176,14 +146,7 @@ const InputPanel: React.FC<InputPanelProps> = ({
           label: <span><FileTextOutlined /> {zhCN.textProcessing}</span>,
           children: (
             <TextInputTab
-              textInput={textInput}
-              setTextInput={setTextInput}
-              onClearResults={onClearResults}
               onGenerateRandomText={onGenerateRandomText}
-              randomLength={randomLength}
-              setRandomLength={setRandomLength}
-              randomness={randomness}
-              setRandomness={setRandomness}
             />
           )
         },
@@ -191,11 +154,7 @@ const InputPanel: React.FC<InputPanelProps> = ({
           key: 'file',
           label: <span><UploadOutlined /> {zhCN.fileProcessing}</span>,
           children: (
-            <FileInputTab
-              fileList={fileList}
-              setFileList={setFileList}
-              onClearResults={onClearResults}
-            />
+            <FileInputTab />
           )
         }
       ]}
