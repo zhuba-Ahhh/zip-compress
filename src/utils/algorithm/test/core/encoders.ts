@@ -13,16 +13,21 @@ import { CompressionLog } from '../../../../types';
 export function encodeBitpack(tokens: Token[], logs?: CompressionLog[]): Uint8Array {
   const writer = new BitWriter();
   
+  let matchCount = 0;
+  let literalCount = 0;
+
   if (logs) logs.push({ timestamp: performance.now(), phase: '初始化', message: `开始编码 ${tokens.length} 个令牌` });
 
   for (const token of tokens) {
     if (token.type === 'literal') {
       writer.writeBit(0);
       writer.writeBits(token.value, 8);
+      literalCount++;
     } else {
       writer.writeBit(1);
       writer.writeBits(token.distance, 12);
       writer.writeBits(token.length, 8);
+      matchCount++;
     }
   }
 
@@ -32,7 +37,17 @@ export function encodeBitpack(tokens: Token[], logs?: CompressionLog[]): Uint8Ar
   writer.writeBits(0, 8);
 
   const res = writer.flush();
-  if (logs) logs.push({ timestamp: performance.now(), phase: '编码完成', message: `编码大小: ${res.length} 字节` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: '编码完成', 
+    message: `编码大小: ${res.length} 字节`,
+    details: {
+      literalCount,
+      matchCount,
+      estimatedBits: literalCount * 9 + matchCount * 21 + 21,
+      actualBytes: res.length
+    }
+  });
   return res;
 }
 
@@ -162,7 +177,15 @@ export function encodeHuffmanDeflate(tokens: Token[], logs?: CompressionLog[]): 
   const llTree = buildHuffmanTreeDeflate(llFreq);
   const distTree = buildHuffmanTreeDeflate(distFreq);
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'Huffman重建', message: '动态 Huffman 树构建成功' });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: 'Huffman重建', 
+    message: '动态 Huffman 树构建成功',
+    details: {
+      llTreeLeaves: llFreq.filter(f => f > 0).length,
+      distTreeLeaves: distFreq.filter(f => f > 0).length
+    }
+  });
 
   serializeTreeDeflate(llTree.root, writer, 9); // Max LL symbol 285 (9 bits)
   serializeTreeDeflate(distTree.root, writer, 5); // Max Dist symbol 29 (5 bits)

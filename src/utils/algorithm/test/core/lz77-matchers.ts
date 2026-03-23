@@ -28,6 +28,8 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
 
   let matchCount = 0;
   let literalCount = 0;
+  let totalMatchLen = 0;
+  let maxMatchLen = 0;
 
   while (cursor < buffer.length) {
     let bestMatchLen = 0;
@@ -72,6 +74,8 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
       
       cursor += bestMatchLen;
       matchCount++;
+      totalMatchLen += bestMatchLen;
+      if (bestMatchLen > maxMatchLen) maxMatchLen = bestMatchLen;
     } else {
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
@@ -79,7 +83,17 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[]):
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77完成', message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: 'LZ77完成', 
+    message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`,
+    details: {
+      totalMatchLen,
+      maxMatchLen,
+      avgMatchLen: matchCount > 0 ? (totalMatchLen / matchCount).toFixed(2) : 0,
+      compressionRatio: `${((matchCount * 2 + literalCount) / buffer.length * 100).toFixed(2)}% (预估 Token 占比)`
+    }
+  });
   return tokens;
 }
 
@@ -99,6 +113,8 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
   let currentHash = 0;
   let matchCount = 0;
   let literalCount = 0;
+  let totalMatchLen = 0;
+  let maxMatchLen = 0;
 
   const insertString = (pos: number) => {
     if (pos <= len - MIN_MATCH_LENGTH) {
@@ -164,6 +180,8 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
       }
       cursor++;
       matchCount++;
+      totalMatchLen += bestMatchLen;
+      if (bestMatchLen > maxMatchLen) maxMatchLen = bestMatchLen;
     } else {
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
@@ -171,7 +189,17 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77完成', message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: 'LZ77完成', 
+    message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`,
+    details: {
+      totalMatchLen,
+      maxMatchLen,
+      avgMatchLen: matchCount > 0 ? (totalMatchLen / matchCount).toFixed(2) : 0,
+      compressionRatio: `${((matchCount * 2 + literalCount) / buffer.length * 100).toFixed(2)}% (预估 Token 占比)`
+    }
+  });
   return tokens;
 }
 
@@ -193,6 +221,8 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
   
   let matchCount = 0;
   let literalCount = 0;
+  let totalMatchLen = 0;
+  let maxMatchLen = 0;
 
   while (cursor < buffer.length) {
     let bestMatchLen = 0;
@@ -259,6 +289,8 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
       }
       cursor++;
       matchCount++;
+      totalMatchLen += bestMatchLen;
+      if (bestMatchLen > maxMatchLen) maxMatchLen = bestMatchLen;
     } else {
       tokens.push({ type: 'literal', value: buffer[cursor] });
       cursor++;
@@ -266,6 +298,16 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: 'LZ77完成', message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: 'LZ77完成', 
+    message: `匹配完成。找到 ${matchCount} 个匹配和 ${literalCount} 个字面量。`,
+    details: {
+      totalMatchLen,
+      maxMatchLen,
+      avgMatchLen: matchCount > 0 ? (totalMatchLen / matchCount).toFixed(2) : 0,
+      compressionRatio: `${((matchCount * 2 + literalCount) / buffer.length * 100).toFixed(2)}% (预估 Token 占比)`
+    }
+  });
   return tokens;
 }

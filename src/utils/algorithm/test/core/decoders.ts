@@ -55,7 +55,16 @@ export function decodeBitpack(buffer: Uint8Array, logs?: CompressionLog[]): Uint
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: '解压完成', message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: '解压完成', 
+    message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}`,
+    details: {
+      matchCount,
+      literalCount,
+      decompressedSize: output.length
+    }
+  });
   return output.getArray();
 }
 
@@ -119,7 +128,16 @@ export function decodeHuffmanDynamic(buffer: Uint8Array, logs?: CompressionLog[]
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: '解压完成', message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: '解压完成', 
+    message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}`,
+    details: {
+      matchCount,
+      literalCount,
+      decompressedSize: output.length
+    }
+  });
   return output.getArray();
 }
 
@@ -194,6 +212,15 @@ export function decodeHuffmanDeflate(buffer: Uint8Array, logs?: CompressionLog[]
     }
   }
 
-  if (logs) logs.push({ timestamp: performance.now(), phase: '解压完成', message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}` });
+  if (logs) logs.push({ 
+    timestamp: performance.now(), 
+    phase: '解压完成', 
+    message: `解压结束。匹配数: ${matchCount}, 字面量数: ${literalCount}`,
+    details: {
+      matchCount,
+      literalCount,
+      decompressedSize: output.length
+    }
+  });
   return output.getArray();
 }

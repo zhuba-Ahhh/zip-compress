@@ -13,6 +13,9 @@ export interface Stats {
   decompressTime: number; // 总时间
   avgCompressTime: number; // 平均时间
   avgDecompressTime: number; // 平均时间
+  compressThroughput?: number; // 压缩吞吐量 MB/s
+  decompressThroughput?: number; // 解压吞吐量 MB/s
+  memoryUsage?: number; // 内存消耗 (MB)
   decompressedSize: number;
   ratio: string;
   isMatch: boolean;

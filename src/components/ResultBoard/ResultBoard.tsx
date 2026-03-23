@@ -64,7 +64,7 @@ const ResultBoard: React.FC<ResultBoardProps> = ({ algorithms, payload, original
     <div style={{ marginTop: 24 }}>
       <Title level={4}>测试结果对比 (循环 {payload.executionCount} 次)</Title>
       
-      {/* 汇总柱状图 */}
+      {/* 汇总柱状图与散点图 */}
       {completedCount === algorithms.length && chartData.length > 0 && (
         <PerformanceChart data={chartData} />
       )}
