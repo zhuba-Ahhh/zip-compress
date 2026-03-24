@@ -37,7 +37,7 @@ export function myLZ77Compress(buffer: Uint8Array, collectLogs: boolean = false)
   const phases: PhaseTiming[] = [];
   const advancedMetrics = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
   const tokens = runWithPhases("LZ77匹配(Pass 1)", () => lz77CompressSimple(buffer, collectLogs ? logs : undefined, advancedMetrics), collectLogs ? phases : undefined);
-  const data = runWithPhases("位流封装", () => encodeBitpack(tokens, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = encodeBitpack(tokens, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   
   if (collectLogs && logs.length > 0) {
     const finalLog = logs[logs.length - 1];
@@ -52,7 +52,7 @@ export function myLZ77Compress(buffer: Uint8Array, collectLogs: boolean = false)
 export function myLZ77Decompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
-  const data = runWithPhases("位流解码输出", () => decodeBitpack(buffer, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = decodeBitpack(buffer, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   return collectLogs ? { data, logs, phases } : data;
 }
 
@@ -64,7 +64,7 @@ export function myLZ771Compress(buffer: Uint8Array, collectLogs: boolean = false
   const phases: PhaseTiming[] = [];
   const advancedMetrics = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
   const tokens = runWithPhases("LZ77匹配(Pass 1)", () => lz77CompressHashChain(buffer, collectLogs ? logs : undefined, advancedMetrics), collectLogs ? phases : undefined);
-  const data = runWithPhases("位流封装", () => encodeBitpack(tokens, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = encodeBitpack(tokens, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   
   if (collectLogs && logs.length > 0) {
     const finalLog = logs[logs.length - 1];
@@ -79,7 +79,7 @@ export function myLZ771Compress(buffer: Uint8Array, collectLogs: boolean = false
 export function myLZ771Decompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
-  const data = runWithPhases("位流解码输出", () => decodeBitpack(buffer, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = decodeBitpack(buffer, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   return collectLogs ? { data, logs, phases } : data;
 }
 
@@ -91,7 +91,7 @@ export function myLZ772Compress(buffer: Uint8Array, collectLogs: boolean = false
   const phases: PhaseTiming[] = [];
   const advancedMetrics = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
   const tokens = runWithPhases("LZ77匹配(Pass 1)", () => lz77CompressHashChainOptimized(buffer, collectLogs ? logs : undefined, advancedMetrics), collectLogs ? phases : undefined);
-  const data = runWithPhases("位流封装", () => encodeBitpack(tokens, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = encodeBitpack(tokens, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   
   if (collectLogs && logs.length > 0) {
     const finalLog = logs[logs.length - 1];
@@ -106,7 +106,7 @@ export function myLZ772Compress(buffer: Uint8Array, collectLogs: boolean = false
 export function myLZ772Decompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
-  const data = runWithPhases("位流解码输出", () => decodeBitpack(buffer, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = decodeBitpack(buffer, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   return collectLogs ? { data, logs, phases } : data;
 }
 
@@ -118,7 +118,7 @@ export function myHuffmanCompress(buffer: Uint8Array, collectLogs: boolean = fal
   const phases: PhaseTiming[] = [];
   const advancedMetrics = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
   const tokens = runWithPhases("LZ77匹配(Pass 1)", () => lz77CompressSimple(buffer, collectLogs ? logs : undefined, advancedMetrics), collectLogs ? phases : undefined);
-  const data = runWithPhases("构建树与编码", () => encodeHuffmanDeflate(tokens, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = encodeHuffmanDeflate(tokens, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   
   if (collectLogs && logs.length > 0) {
     const finalLog = logs[logs.length - 1];
@@ -133,7 +133,7 @@ export function myHuffmanCompress(buffer: Uint8Array, collectLogs: boolean = fal
 export function myHuffmanDecompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
-  const data = runWithPhases("位流解码输出", () => decodeHuffmanDeflate(buffer, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = decodeHuffmanDeflate(buffer, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   return collectLogs ? { data, logs, phases } : data;
 }
 
@@ -145,7 +145,7 @@ export function myHuffman1Compress(buffer: Uint8Array, collectLogs: boolean = fa
   const phases: PhaseTiming[] = [];
   const advancedMetrics = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
   const tokens = runWithPhases("LZ77匹配(Pass 1)", () => lz77CompressHashChain(buffer, collectLogs ? logs : undefined, advancedMetrics), collectLogs ? phases : undefined);
-  const data = runWithPhases("构建树与编码", () => encodeHuffmanDynamic(tokens, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = encodeHuffmanDynamic(tokens, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   
   if (collectLogs && logs.length > 0) {
     const finalLog = logs[logs.length - 1];
@@ -160,7 +160,7 @@ export function myHuffman1Compress(buffer: Uint8Array, collectLogs: boolean = fa
 export function myHuffman1Decompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
-  const data = runWithPhases("位流解码输出", () => decodeHuffmanDynamic(buffer, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = decodeHuffmanDynamic(buffer, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   return collectLogs ? { data, logs, phases } : data;
 }
 
@@ -172,7 +172,7 @@ export function myHuffman2Compress(buffer: Uint8Array, collectLogs: boolean = fa
   const phases: PhaseTiming[] = [];
   const advancedMetrics = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
   const tokens = runWithPhases("LZ77匹配(Pass 1)", () => lz77CompressHashChainOptimized(buffer, collectLogs ? logs : undefined, advancedMetrics), collectLogs ? phases : undefined);
-  const data = runWithPhases("构建树与编码", () => encodeHuffmanDeflate(tokens, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = encodeHuffmanDeflate(tokens, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   
   if (collectLogs && logs.length > 0) {
     const finalLog = logs[logs.length - 1];
@@ -187,6 +187,7 @@ export function myHuffman2Compress(buffer: Uint8Array, collectLogs: boolean = fa
 export function myHuffman2Decompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
-  const data = runWithPhases("位流解码输出", () => decodeHuffmanDeflate(buffer, collectLogs ? logs : undefined), collectLogs ? phases : undefined);
+  const data = decodeHuffmanDeflate(buffer, collectLogs ? logs : undefined, collectLogs ? phases : undefined);
   return collectLogs ? { data, logs, phases } : data;
 }
+
