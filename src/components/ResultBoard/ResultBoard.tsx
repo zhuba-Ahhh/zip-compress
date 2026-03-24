@@ -67,7 +67,7 @@ const ResultBoard: React.FC = () => {
     <div style={{ marginTop: 24 }}>
       <Title level={4}>{zhCN.testResultsComparison} ({zhCN.loopTimes} {payload.executionCount} {zhCN.times})</Title>
 
-      <Row gutter={[16, 16]}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         {algorithms.sort((a, b) => a.localeCompare(b)).map((algo) => (
           <Col xs={24} md={algorithms.length > 1 ? 12 : 24} key={`${algo}-${payload.triggerId}`}>
             <AlgorithmCard

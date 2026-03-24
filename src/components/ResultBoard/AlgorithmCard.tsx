@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, memo } from 'react';
 import { Card, Descriptions, Typography, Tag, Space, Button, Spin, Progress, Tooltip } from 'antd';
 import { DownloadOutlined, SyncOutlined, FileTextOutlined } from '@ant-design/icons';
 import { Stats } from '@/types';
@@ -6,12 +6,140 @@ import { formatSize, downloadFile } from '@/utils';
 import { ALGORITHM_OPTIONS, CompressionAlgorithm } from '@/common';
 import LogModal from './LogModal';
 import AdvancedMetricsChart from './AdvancedMetricsChart';
-// 假设这里引入 worker 进行通讯
 import { zhCN } from '@/locales/zh-CN';
 import { WorkerMessage } from '@/workers/compression.worker';
 import { useAppContext } from '@/contexts/AppContext';
+import styles from './AlgorithmCard.module.less';
 
 const { Text } = Typography;
+
+// ==========================================
+// 1. Loading Indicator Component
+// ==========================================
+const LoadingIndicator = memo(({
+  loading,
+  progress,
+  executionCount
+}: {
+  loading: boolean,
+  progress: number,
+  executionCount: number
+}) => {
+  if (!loading) return null;
+
+  return (
+    <>
+      <SyncOutlined spin style={{ fontSize: 24, marginBottom: 8, color: '#1890ff' }} />
+      {executionCount > 1 ? (
+        <Progress
+          percent={Math.round((progress / executionCount) * 100)}
+          format={() => (
+            <div style={{ color: '#1890ff', fontSize: 12 }}>
+              {`${zhCN.currentProgress}: ${progress}/${executionCount}`}
+            </div>
+          )}
+          status="active"
+          size="small"
+          strokeColor={{ '0%': '#108ee9', '100%': '#87d068' }}
+        />
+      ) : (
+        <div style={{ color: '#1890ff', fontSize: 12 }}>{zhCN.processing}</div>
+      )}
+    </>
+  );
+});
+
+// ==========================================
+// 2. Action Buttons Component
+// ==========================================
+const ActionButtons = memo(({
+  stats,
+  originalFileName,
+  onShowLogs
+}: {
+  stats: Stats,
+  originalFileName: string,
+  onShowLogs: () => void
+}) => {
+  if (stats.loading || !stats.compressedData || stats.error) return null;
+
+  return (
+    <Space size="small">
+      {stats.logs && (
+        <Button
+          size="small"
+          type="primary"
+          ghost
+          icon={<FileTextOutlined />}
+          onClick={onShowLogs}
+        >{zhCN.viewLogs}</Button>
+      )}
+      <Button
+        size="small"
+        type="dashed"
+        icon={<DownloadOutlined />}
+        onClick={() => downloadFile(stats.compressedData!, `${originalFileName}.${stats.algorithm}`)}
+      >{zhCN.downloadCompressed}</Button>
+      <Button
+        size="small"
+        type="dashed"
+        icon={<DownloadOutlined />}
+        onClick={() => downloadFile(stats.decompressedData!, `decompressed_${originalFileName}`)}
+      >{zhCN.downloadDecompressed}</Button>
+    </Space>
+  );
+});
+
+// ==========================================
+// 3. Stats Descriptions Component
+// ==========================================
+const StatsDescriptions = memo(({ stats, algorithmDescription }: { stats: Stats, algorithmDescription: string }) => {
+  if (stats.error) {
+    return (
+      <div style={{ color: 'red', padding: '40px 0', textAlign: 'center' }}>
+        {zhCN.executionFailed}: {stats.error}
+      </div>
+    );
+  }
+
+  return (
+    <Descriptions column={2} size="small" style={{ minHeight: 140 }}>
+      <Descriptions.Item label={zhCN.algorithm} span={2}>
+        <Text strong ellipsis={{ tooltip: algorithmDescription }}>{algorithmDescription}</Text>
+      </Descriptions.Item>
+      <Descriptions.Item label={zhCN.originalSize}>
+        <Text strong>{formatSize(stats.originalSize)}</Text> <Text type="secondary" style={{ fontSize: 11 }}>({stats.originalSize} B)</Text>
+      </Descriptions.Item>
+      <Descriptions.Item label={zhCN.compressedSize}>
+        <Text strong type="success">{formatSize(stats.compressedSize)}</Text> <Text type="secondary" style={{ fontSize: 11 }}>({stats.compressedSize} B)</Text>
+      </Descriptions.Item>
+      <Descriptions.Item label={zhCN.compressionRatio}>
+        <Tag color="blue">{stats.ratio || '-'}</Tag>
+      </Descriptions.Item>
+      <Descriptions.Item label={zhCN.dataConsistency}>
+        {!stats.loading && stats.ratio !== '' && (
+          stats.isMatch ? <Tag color="success">{zhCN.verificationPassed}</Tag> : <Tag color="error">{zhCN.dataCorrupted}</Tag>
+        )}
+      </Descriptions.Item>
+      <Descriptions.Item label={zhCN.avgCompressTime}>
+        <Text type="warning">{stats.avgCompressTime.toFixed(2)} ms</Text>
+      </Descriptions.Item>
+      <Descriptions.Item label={zhCN.avgDecompressTime}>
+        <Text type="warning">{stats.avgDecompressTime.toFixed(2)} ms</Text>
+      </Descriptions.Item>
+      {stats.executionCount > 1 && (
+        <>
+          <Descriptions.Item label={`${zhCN.total}${zhCN.compressionTime}`}>
+            <Text type="secondary">{stats.compressTime.toFixed(2)} ms</Text>
+          </Descriptions.Item>
+          <Descriptions.Item label={`${zhCN.total}${zhCN.decompressionTime}`}>
+            <Text type="secondary">{stats.decompressTime.toFixed(2)} ms</Text>
+          </Descriptions.Item>
+        </>
+      )}
+    </Descriptions>
+  );
+});
 
 export interface AlgorithmCardProps {
   algorithm: CompressionAlgorithm;
@@ -47,13 +175,11 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, onComplete }) 
       });
       setProgress(0);
 
-      // Create a new worker for each algorithm run to isolate memory and avoid blocking
       const worker = new Worker(new URL('@/workers/compression.worker.ts', import.meta.url), { type: 'module' });
       workerRef.current = worker;
 
       worker.onmessage = (e: MessageEvent) => {
         if (isCancelled) return;
-
         const { type, progress: currentProgress, result, error } = e.data;
 
         if (type === 'progress') {
@@ -104,133 +230,58 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, onComplete }) 
         }
       };
 
-      const message: WorkerMessage = {
+      worker.postMessage({
         id: payload.triggerId,
         action: 'runTest',
         data: payload.data,
         algorithm,
         collectLogs: payload.collectLogs,
         executionCount: payload.executionCount
-      };
-
-      worker.postMessage(message);
+      } as WorkerMessage);
     };
 
     runTest();
 
     return () => {
       isCancelled = true;
-      if (workerRef.current) {
-        workerRef.current.terminate();
-      }
+      if (workerRef.current) workerRef.current.terminate();
     };
   }, [algorithm, payload]);
 
   if (!stats) return null;
 
-  const algorithmName = ALGORITHM_OPTIONS.find(item => item.value === stats.algorithm);
+  const algorithmInfo = ALGORITHM_OPTIONS.find(item => item.value === stats.algorithm);
+  const algorithmDescription = algorithmInfo?.description || stats.algorithm;
 
   return (
     <>
       <Card
         type="inner"
         title={
-          <Tooltip title={algorithmName?.description || ''}>
-            <Tag color="processing">
-              {stats.algorithm}
-            </Tag>
+          <Tooltip title={algorithmDescription}>
+            <Tag color="processing">{stats.algorithm}</Tag>
           </Tooltip>
         }
         style={{ background: '#fafafa', height: '100%' }}
         extra={
-          !stats.loading && stats.compressedData && !stats.error && (
-            <Space>
-              {stats.logs && (
-                <Button
-                  size="small"
-                  type="primary"
-                  ghost
-                  icon={<FileTextOutlined />}
-                  onClick={() => setIsLogModalVisible(true)}
-                >{zhCN.viewLogs}</Button>
-              )}
-              <Button
-                size="small"
-                type="dashed"
-                icon={<DownloadOutlined />}
-                onClick={() => downloadFile(stats.compressedData!, `${originalFileName}.${stats.algorithm}`)}
-              >{zhCN.downloadCompressed}</Button>
-              <Button
-                size="small"
-                type="dashed"
-                icon={<DownloadOutlined />}
-                onClick={() => downloadFile(stats.decompressedData!, `decompressed_${originalFileName}`)}
-              >{zhCN.downloadDecompressed}</Button>
-            </Space>
-          )
+          <ActionButtons
+            stats={stats}
+            originalFileName={originalFileName}
+            onShowLogs={() => setIsLogModalVisible(true)}
+          />
         }
       >
-        <Spin
-          spinning={stats.loading}
-          indicator={<SyncOutlined spin style={{ fontSize: 24, marginBottom: 8 }} />}
-          tip={
-            payload && payload.executionCount > 1 ? (
-              <div style={{ width: '80%', margin: '0 auto', marginTop: 8 }}>
-                <Progress
-                  percent={Math.round((progress / payload.executionCount) * 100)}
-                  format={() => `${zhCN.currentProgress}: ${progress}/${payload.executionCount}`}
-                />
-              </div>
-            ) : (
-              <div style={{ marginTop: 8, color: '#1890ff' }}>{zhCN.processing}</div>
-            )
-          }
+        <Spin 
+          spinning={!!stats.loading}
+          className={styles.spin}
+          indicator={<LoadingIndicator loading={!!stats.loading} progress={progress} executionCount={payload?.executionCount || 1} />}
         >
-          {stats.error ? (
-            <div style={{ color: 'red', padding: '40px 0', textAlign: 'center' }}>
-              {zhCN.executionFailed}: {stats.error}
-            </div>
-          ) : (
-              <Descriptions column={2} size="small" style={{ minHeight: 140 }}>
-                <Descriptions.Item label={zhCN.algorithm} span={2}>
-                  <Text strong ellipsis={{ tooltip: algorithmName?.description || '' }}>{algorithmName?.description || stats.algorithm}</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label={zhCN.originalSize}>
-                  <Text strong>{formatSize(stats.originalSize)}</Text> ({stats.originalSize} B)
-                </Descriptions.Item>
-                <Descriptions.Item label={zhCN.compressedSize}>
-                  <Text strong type="success">{formatSize(stats.compressedSize)}</Text> ({stats.compressedSize} B)
-                </Descriptions.Item>
-                <Descriptions.Item label={zhCN.compressionRatio}>
-                  <Tag color="blue">{stats.ratio || '-'}</Tag>
-                </Descriptions.Item>
-                <Descriptions.Item label={zhCN.dataConsistency}>
-                  {!stats.loading && stats.ratio !== '' && (
-                    stats.isMatch ? <Tag color="success">{zhCN.verificationPassed}</Tag> : <Tag color="error">{zhCN.dataCorrupted}</Tag>
-                  )}
-                </Descriptions.Item>
-                <Descriptions.Item label={zhCN.avgCompressTime}>
-                  <Text type="warning">{stats.avgCompressTime.toFixed(2)} ms</Text>
-                </Descriptions.Item>
-                <Descriptions.Item label={zhCN.avgDecompressTime}>
-                  <Text type="warning">{stats.avgDecompressTime.toFixed(2)} ms</Text>
-                </Descriptions.Item>
-                {stats.executionCount > 1 && (
-                  <Descriptions.Item label={`${zhCN.total}${zhCN.compressionTime}`}>
-                    <Text type="secondary">{stats.compressTime.toFixed(2)} ms</Text>
-                  </Descriptions.Item>
-                )}
-                {stats.executionCount > 1 && (
-                  <Descriptions.Item label={`${zhCN.total}${zhCN.decompressionTime}`}>
-                    <Text type="secondary">{stats.decompressTime.toFixed(2)} ms</Text>
-                  </Descriptions.Item>
-                )}
-            </Descriptions>
-          )}
+          <StatsDescriptions stats={stats} algorithmDescription={algorithmDescription} />
+
           {!stats.loading && stats.advancedMetrics && showAdvancedMetrics && (
             <AdvancedMetricsChart
               metrics={stats.advancedMetrics}
-              algorithmName={algorithmName?.description || stats.algorithm}
+              algorithmName={algorithmDescription}
             />
           )}
         </Spin>
@@ -239,7 +290,7 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, onComplete }) 
       <LogModal
         visible={isLogModalVisible}
         onCancel={() => setIsLogModalVisible(false)}
-        title={`${algorithmName?.description || stats.algorithm} ${zhCN.executionLogs}`}
+        title={`${algorithmDescription} ${zhCN.executionLogs}`}
         logs={stats.logs}
       />
     </>
@@ -247,3 +298,4 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, onComplete }) 
 };
 
 export default AlgorithmCard;
+
