@@ -7,7 +7,8 @@ import {
   myHuffmanCompress, myHuffmanDecompress, 
   myHuffman1Compress, myHuffman1Decompress, 
   myLZ772Compress, myLZ772Decompress, 
-  myHuffman2Compress, myHuffman2Decompress 
+  myHuffman2Compress, myHuffman2Decompress,
+  myHuffmanStreamCompress, myHuffmanStreamDecompress
 } from '@/utils/algorithm/test';
 import { CompressionAlgorithm } from '@/common';
 import { CompressionLog, PhaseTiming } from '@/types';
@@ -37,6 +38,7 @@ const compressors: Record<string, (data: Uint8Array, collectLogs?: boolean) => U
   [CompressionAlgorithm.Huffman]: (data, collectLogs = false) => myHuffmanCompress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.Huffman1]: (data, collectLogs = false) => myHuffman1Compress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.Huffman2]: (data, collectLogs = false) => myHuffman2Compress(data, collectLogs) as unknown as DetailedCompressionResult,
+  [CompressionAlgorithm.HuffmanStream]: (data, collectLogs = false) => myHuffmanStreamCompress(data, collectLogs) as unknown as DetailedCompressionResult,
 };
 
 const deCompressors: Record<string, (data: Uint8Array, collectLogs?: boolean) => Uint8Array | Promise<Uint8Array> | DetailedCompressionResult> = {
@@ -52,6 +54,7 @@ const deCompressors: Record<string, (data: Uint8Array, collectLogs?: boolean) =>
   [CompressionAlgorithm.Huffman]: (data, collectLogs = false) => myHuffmanDecompress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.Huffman1]: (data, collectLogs = false) => myHuffman1Decompress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.Huffman2]: (data, collectLogs = false) => myHuffman2Decompress(data, collectLogs) as unknown as DetailedCompressionResult,
+  [CompressionAlgorithm.HuffmanStream]: (data, collectLogs = false) => myHuffmanStreamDecompress(data, collectLogs) as unknown as DetailedCompressionResult,
 };
 
 export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm, collectLogs: boolean = false): Promise<DetailedCompressionResult> => {

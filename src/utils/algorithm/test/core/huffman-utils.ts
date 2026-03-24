@@ -35,27 +35,35 @@ export function getLengthBase(code: number) {
 
 // Distance 映射：将 1~32768 的距离映射为 0~29 的 Code
 // 以及对应的 Extra Bits 和 Extra Val
+const distExtraBits = [
+  0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13
+];
+const distBases = [
+  1, 2, 3, 4, 5, 7, 9, 13, 17, 25, 33, 49, 65, 97, 129, 193, 257, 385, 513, 769, 1025, 1537, 2049, 3073, 4097, 6145, 8193, 12289, 16385, 24577
+];
+
 export function getDistanceInfo(dist: number) {
-  if (dist === 1) return { code: 0, extraBits: 0, extraVal: 0 };
-  if (dist === 2) return { code: 1, extraBits: 0, extraVal: 0 };
-  if (dist === 3) return { code: 2, extraBits: 0, extraVal: 0 };
-  if (dist === 4) return { code: 3, extraBits: 0, extraVal: 0 };
-  const extraBits = Math.floor(Math.log2(dist - 1)) - 1;
-  const base = (1 << (extraBits + 1)) + 1;
-  const half = 1 << extraBits;
-  const code = extraBits * 2 + 2 + (dist - base >= half ? 1 : 0);
-  const extraVal = dist - base - (dist - base >= half ? half : 0);
+  let code = 0;
+  // 简单查找 code
+  if (dist <= 4) {
+    code = dist - 1;
+  } else {
+    // 使用二分查找或直接遍历，因为只有 30 个 code
+    for (let i = 29; i >= 0; i--) {
+      if (dist >= distBases[i]) {
+        code = i;
+        break;
+      }
+    }
+  }
+  
+  const extraBits = distExtraBits[code];
+  const extraVal = dist - distBases[code];
   return { code, extraBits, extraVal };
 }
 
 export function getDistanceBase(code: number) {
-  if (code === 0) return { base: 1, extraBits: 0 };
-  if (code === 1) return { base: 2, extraBits: 0 };
-  if (code === 2) return { base: 3, extraBits: 0 };
-  if (code === 3) return { base: 4, extraBits: 0 };
-  const extraBits = Math.floor((code - 2) / 2);
-  const base = (1 << (extraBits + 1)) + 1 + ((code % 2) * (1 << extraBits));
-  return { base, extraBits };
+  return { base: distBases[code], extraBits: distExtraBits[code] };
 }
 
 // ==========================================

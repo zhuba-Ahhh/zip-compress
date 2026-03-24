@@ -8,6 +8,7 @@ export enum CompressionAlgorithm {
   Huffman = 'huffman',
   Huffman1 = 'huffman-1',
   Huffman2 = 'huffman-2',
+  HuffmanStream = 'huffman-stream',
 }
 
 export const ALGORITHM_OPTIONS = [
@@ -20,6 +21,7 @@ export const ALGORITHM_OPTIONS = [
   { value: CompressionAlgorithm.Huffman, label: 'huffman', description: '基础 Deflate (O(N*W) 暴力匹配 + 静态双 Huffman 树)' },
   { value: CompressionAlgorithm.Huffman1, label: 'huffman-1', description: '单树 Deflate (O(N) 哈希链表 + 动态单 Huffman 树，距离不编码，速度快)' },
   { value: CompressionAlgorithm.Huffman2, label: 'huffman-2', description: '标准 Deflate (O(N) 哈希链表 + 动态双 Huffman 树，长度/距离映射，压缩率高)' },
+  { value: CompressionAlgorithm.HuffmanStream, label: 'huffman-stream', description: '流式 Deflate (分块处理 + 动态双 Huffman 树 + 内存复用，适合大文件)' },
 ];
 
 export const MAX_FILE_SIZE_HINT = '500MB';
