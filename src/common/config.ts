@@ -11,6 +11,9 @@ export enum CompressionAlgorithm {
   HuffmanStream = 'huffman-stream',
   HuffmanStreamOptimized = 'huffman-stream-optimized',
   HuffmanStreamFastDecode = 'huffman-stream-fast-decode',
+  LZ4js = 'lz4js',
+  SnappyJS = 'snappyjs',
+  Fflate = 'fflate',
 }
 
 export const ALGORITHM_OPTIONS = [
@@ -26,6 +29,9 @@ export const ALGORITHM_OPTIONS = [
   { value: CompressionAlgorithm.HuffmanStream, label: 'huffman-stream', description: '流式 Deflate (分块处理 + 动态双 Huffman 树 + 内存复用，适合大文件)' },
   { value: CompressionAlgorithm.HuffmanStreamOptimized, label: 'huffman-stream-optimized', description: '极致流式 Deflate (惰性匹配 + 位运算哈希 + 动态双 Huffman 树)' },
   { value: CompressionAlgorithm.HuffmanStreamFastDecode, label: 'huffman-stream-fast-decode', description: '解压极速版 (查表解码 + 大块拷贝 + 动态双 Huffman 树)' },
+  { value: CompressionAlgorithm.LZ4js, label: 'lz4js', description: '高速 LZ4 压缩 ' },
+  { value: CompressionAlgorithm.SnappyJS, label: 'snappyjs', description: 'Google Snappy 压缩算法的纯 JavaScript 实现，性能接近原生' },
+  { value: CompressionAlgorithm.Fflate, label: 'fflate', description: '高性能、多格式压缩库，支持 Deflate、Gzip、Zlib 和 Brotli' },
 ];
 
 export const MAX_FILE_SIZE_HINT = '500MB';

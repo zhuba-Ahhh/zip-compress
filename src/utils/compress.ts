@@ -1,5 +1,8 @@
 import pako from 'pako';
 import LZString from 'lz-string';
+import { compress as LZ4Compress, decompress as LZ4Decompress } from 'lz4js';
+import SnappyJS from 'snappyjs';
+import * as fflate from 'fflate';
 import { myZipCompress, myZipDecompress } from '@/utils/algorithm/myzip';
 import { 
   myLZ77Compress, myLZ77Decompress, 
@@ -43,6 +46,9 @@ const compressors: Record<string, (data: Uint8Array, collectLogs?: boolean) => U
   [CompressionAlgorithm.HuffmanStream]: (data, collectLogs = false) => myHuffmanStreamCompress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.HuffmanStreamOptimized]: (data, collectLogs = false) => myHuffmanStreamOptimizedCompress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.HuffmanStreamFastDecode]: (data, collectLogs = false) => myHuffmanStreamFastDecodeCompress(data, collectLogs) as unknown as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ4js]: (data) => LZ4Compress(data),
+  [CompressionAlgorithm.SnappyJS]: (data) => SnappyJS.compress(data),
+  [CompressionAlgorithm.Fflate]: (data) => fflate.compressSync(data),
 };
 
 const deCompressors: Record<string, (data: Uint8Array, collectLogs?: boolean) => Uint8Array | Promise<Uint8Array> | DetailedCompressionResult> = {
@@ -61,6 +67,9 @@ const deCompressors: Record<string, (data: Uint8Array, collectLogs?: boolean) =>
   [CompressionAlgorithm.HuffmanStream]: (data, collectLogs = false) => myHuffmanStreamDecompress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.HuffmanStreamOptimized]: (data, collectLogs = false) => myHuffmanStreamOptimizedDecompress(data, collectLogs) as unknown as DetailedCompressionResult,
   [CompressionAlgorithm.HuffmanStreamFastDecode]: (data, collectLogs = false) => myHuffmanStreamFastDecodeDecompress(data, collectLogs) as unknown as DetailedCompressionResult,
+  [CompressionAlgorithm.LZ4js]: (data) => LZ4Decompress(data),
+  [CompressionAlgorithm.SnappyJS]: (data) => SnappyJS.uncompress(data),
+  [CompressionAlgorithm.Fflate]: (data) => fflate.decompressSync(data),
 };
 
 export const compressData = async (data: Uint8Array, algorithm: CompressionAlgorithm, collectLogs: boolean = false): Promise<DetailedCompressionResult> => {
