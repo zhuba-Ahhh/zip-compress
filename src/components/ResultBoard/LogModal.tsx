@@ -202,7 +202,7 @@ const LogModal: React.FC<LogModalProps> = ({ visible, onCancel, title, logs }) =
             children: (
               <div style={{ paddingBottom: 12 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <Tag color={getLevelColor(log.level)} bordered={false}>{log.level?.toUpperCase() || 'INFO'}</Tag>
+                  <Tag color={getLevelColor(log.level)} variant="filled">{log.level?.toUpperCase() || 'INFO'}</Tag>
                   <Text strong>{log.phase}</Text> 
                   <Text type="secondary" style={{ fontSize: '12px' }}>
                     +{index === 0 ? '0.00' : (log.timestamp - filteredLogs[index - 1].timestamp).toFixed(2)}ms 
