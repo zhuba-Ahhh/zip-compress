@@ -8,7 +8,7 @@
  * 4. Elias Gamma 编码：用于高效存储无上界的正整数（如距离、长度、频率等）。
  */
 
-import { PhaseTiming, CompressionLog } from '../../../types';
+import { PhaseTiming, CompressionLog } from '@/types';
 
 /**
  * 位写入器 (BitWriter)

@@ -125,14 +125,45 @@ export class BitReader {
    */
   readBits(numBits: number): number | null {
     let value = 0;
-    // 循环提取指定数量的 bit，每次提取出来的 bit 作为最低位，之前提取的左移
-    // 从而保证先读出的是高位，后读出的是低位
     for (let i = 0; i < numBits; i++) {
       const bit = this.readBit();
       if (bit === null) return null;
       value = (value << 1) | bit;
     }
     return value;
+  }
+
+  /**
+   * 偷看接下来的若干个 bit (但不真正消耗流位置)
+   * 这对于查表优化非常有用
+   */
+  peekBits(numBits: number): number | null {
+    let value = 0;
+    let tempBytePos = this.bytePos;
+    let tempBitPos = this.bitPos;
+
+    for (let i = 0; i < numBits; i++) {
+      if (tempBytePos >= this.buffer.length) return null;
+      const bit = (this.buffer[tempBytePos] >> (7 - tempBitPos)) & 1;
+      value = (value << 1) | bit;
+      tempBitPos++;
+      if (tempBitPos === 8) {
+        tempBitPos = 0;
+        tempBytePos++;
+      }
+    }
+    return value;
+  }
+
+  /**
+   * 消耗指定的 bit 位数，配合 peekBits 使用
+   */
+  skipBits(numBits: number): void {
+    this.bitPos += numBits;
+    while (this.bitPos >= 8) {
+      this.bitPos -= 8;
+      this.bytePos++;
+    }
   }
 }
 

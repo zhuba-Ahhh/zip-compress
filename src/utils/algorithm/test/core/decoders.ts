@@ -5,7 +5,7 @@ import {
   deserializeTreeDeflate, HuffmanNodeDeflate,
   readHuffmanTreeDynamic, HuffmanNodeDynamic
 } from './huffman-utils';
-import { CompressionLog, PhaseTiming } from '../../../../types';
+import { CompressionLog, PhaseTiming } from '@/types';
 import { trackPhase } from './utils';
 
 /**

@@ -1,7 +1,7 @@
 import { BitWriter } from './BitWriter';
 import { BitReader } from './BitReader';
 import { HuffmanNode } from './Huffman';
-import { PhaseTiming, CompressionLog, AdvancedMetrics } from '../../../types';
+import { PhaseTiming, CompressionLog, AdvancedMetrics } from '@/types';
 
 export interface MyZipCompressResult {
   data: Uint8Array;

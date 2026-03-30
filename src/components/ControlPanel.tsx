@@ -28,7 +28,7 @@ const ControlPanel: React.FC<ControlPanelProps> = ({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, marginBottom: 24 }}>
-      <Space direction="vertical" align="center" size="middle">
+      <Space orientation="vertical" align="center" size="middle">
         <Space>
           <Text strong>{zhCN.compressionAlgorithms}</Text>
           <Select 

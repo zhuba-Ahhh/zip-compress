@@ -1,4 +1,4 @@
-import { PhaseTiming } from '../../../../types';
+import { PhaseTiming } from '@/types';
 
 /**
  * 记录阶段耗时并返回结果

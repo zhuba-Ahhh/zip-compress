@@ -175,9 +175,42 @@ export function deserializeTreeDeflate(reader: BitReader, symbolBits: number, st
 }
 
 // ==========================================
-// 树结构 2：动态 Huffman (Huffman-1 风格) 的树节点
-// 特点：叶子节点包含 value，内部节点包含频率，
-// 结构较简单，且包含特有的 `writeHuffmanTree` 先序遍历序列化方法。
+// 解码查表优化 (Lookup Table)
+// 为了避免在解压时逐 bit 遍历二叉树，我们构建一个查找表。
+// ==========================================
+export class HuffmanDecoderTable {
+  public readonly MAX_LOOKUP_BITS = 11;
+  public readonly lookupTable: Int32Array; // 格式: (symbol << 16) | bitLen
+  public root: HuffmanNodeDeflate;
+
+  constructor(root: HuffmanNodeDeflate) {
+    this.root = root;
+    this.lookupTable = new Int32Array(1 << this.MAX_LOOKUP_BITS).fill(-1);
+    this.buildTable(root, 0, 0);
+  }
+
+  private buildTable(node: HuffmanNodeDeflate, currentCode: number, bitLen: number) {
+    if (bitLen > this.MAX_LOOKUP_BITS) {
+      return;
+    }
+    
+    if (node.symbol !== null) {
+      const shift = this.MAX_LOOKUP_BITS - bitLen;
+      const start = currentCode << shift;
+      const end = start + (1 << shift);
+      
+      const entry = (node.symbol << 16) | bitLen;
+      for (let i = start; i < end; i++) {
+        this.lookupTable[i] = entry;
+      }
+      return;
+    }
+
+    if (node.left) this.buildTable(node.left, (currentCode << 1) | 0, bitLen + 1);
+    if (node.right) this.buildTable(node.right, (currentCode << 1) | 1, bitLen + 1);
+  }
+}
+
 // ==========================================
 export class HuffmanNodeDynamic {
   value: number | null;

@@ -17,11 +17,14 @@ import { LZ77State, compressBlock } from './core/lz77-stream';
 import { BitWriter, BitReader, DynamicUint8Array } from './core/io';
 import { 
   getLengthInfo, getDistanceInfo, 
-  buildHuffmanTreeDeflate, serializeTreeDeflate,
-  getLengthBase, getDistanceBase, deserializeTreeDeflate,
-  HuffmanNodeDeflate
+  buildHuffmanTreeDeflate,
+  getLengthBase, getDistanceBase,
+  HuffmanNodeDeflate,
+  HuffmanDecoderTable,
+  serializeTreeDeflate,
+  deserializeTreeDeflate
 } from './core/huffman-utils';
-import { CompressionLog, PhaseTiming } from '../../../types';
+import { AdvancedMetrics, CompressionLog, PhaseTiming } from '@/types';
 import { DetailedCompressionResult } from '../../compress';
 
 function runWithPhases<T>(
@@ -152,7 +155,7 @@ export function myHuffmanDecompress(buffer: Uint8Array, collectLogs: boolean = f
 export function myHuffmanStreamCompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];
-  const advancedMetrics: import('../../../types').AdvancedMetrics | undefined = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
+  const advancedMetrics: AdvancedMetrics | undefined = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
 
   const writer = new BitWriter();
   const state = new LZ77State(buffer);
@@ -346,8 +349,210 @@ export function myHuffman1Decompress(buffer: Uint8Array, collectLogs: boolean = 
 }
 
 // ==========================================
-// 6. 终极版 Huffman (环形数组哈希链表 + 双树 Huffman) - 对应原 Huffman-2.ts
+// 8. 极致流式版 Huffman (惰性匹配 + 位运算哈希 + 动态双 Huffman 树)
 // ==========================================
+export function myHuffmanStreamOptimizedCompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
+  const logs: CompressionLog[] = [];
+  const phases: PhaseTiming[] = [];
+  const advancedMetrics: AdvancedMetrics | undefined = collectLogs ? { chunks: [], timeSeries: [] } : undefined;
+
+  const writer = new BitWriter();
+  const state = new LZ77State(buffer);
+  const BLOCK_SIZE = 32768; // 32KB 块大小
+
+  if (collectLogs) logs.push({ timestamp: performance.now(), phase: '初始化', message: `开始优化版流式处理，总字节: ${buffer.length}` });
+
+  const startTotal = performance.now();
+  
+  while (state.cursor < buffer.length) {
+    const isLast = (state.cursor + BLOCK_SIZE >= buffer.length);
+    const blockStartPos = state.cursor;
+    
+    // 1. LZ77 匹配
+    const tokens = runWithPhases(`LZ77匹配 (块)`, () => compressBlock(state, BLOCK_SIZE), collectLogs ? phases : undefined);
+    
+    // 2. 统计频率并构建树
+    const llFreq = new Array(286).fill(0);
+    const distFreq = new Array(30).fill(0);
+    llFreq[256] = 1; // EOF
+
+    for (const token of tokens) {
+      if (token.type === 'literal') {
+        llFreq[token.value]++;
+      } else {
+        const lenInfo = getLengthInfo(token.length);
+        llFreq[lenInfo.code]++;
+        const distInfo = getDistanceInfo(token.distance);
+        distFreq[distInfo.code]++;
+      }
+    }
+
+    const llTree = buildHuffmanTreeDeflate(llFreq);
+    const distTree = buildHuffmanTreeDeflate(distFreq);
+
+    // 3. 写入块头 (1 bit BFINAL)
+    writer.writeBit(isLast ? 1 : 0);
+
+    // 4. 写入 Huffman 树
+    serializeTreeDeflate(llTree.root, writer, 9);
+    serializeTreeDeflate(distTree.root, writer, 5);
+
+    // 5. 写入块数据
+    for (const token of tokens) {
+      if (token.type === 'literal') {
+        const info = llTree.codes.get(token.value)!;
+        writer.writeBits(info.code, info.bitLen);
+      } else {
+        const lenInfo = getLengthInfo(token.length);
+        const llInfo = llTree.codes.get(lenInfo.code)!;
+        writer.writeBits(llInfo.code, llInfo.bitLen);
+        if (lenInfo.extraBits > 0) writer.writeBits(lenInfo.extraVal, lenInfo.extraBits);
+
+        const distInfo = getDistanceInfo(token.distance);
+        const distInfoCode = distTree.codes.get(distInfo.code)!;
+        writer.writeBits(distInfoCode.code, distInfoCode.bitLen);
+        if (distInfo.extraBits > 0) writer.writeBits(distInfo.extraVal, distInfo.extraBits);
+      }
+    }
+
+    // 写入块结束符
+    const eofInfo = llTree.codes.get(256)!;
+    writer.writeBits(eofInfo.code, eofInfo.bitLen);
+
+    if (advancedMetrics) {
+      const originalSize = state.cursor - blockStartPos;
+      advancedMetrics.chunks.push({
+        offset: blockStartPos,
+        originalSize,
+        compressedSize: 0, 
+        ratio: 0
+      });
+      advancedMetrics.timeSeries.push({
+        timeMs: performance.now() - startTotal,
+        processedBytes: state.cursor,
+        instantSpeed: 0 
+      });
+    }
+    
+    if (isLast) break;
+  }
+
+  const data = writer.flush();
+  
+  if (collectLogs) {
+    logs.push({ 
+      timestamp: performance.now(), 
+      phase: '压缩完成', 
+      level: 'info',
+      message: `优化版流式处理完成。总输出: ${data.length} 字节`,
+      details: {
+        originalSize: buffer.length,
+        compressedSize: data.length,
+        ratio: `${((data.length / buffer.length) * 100).toFixed(2)}%`
+      }
+    });
+  }
+
+  return collectLogs ? { data, logs, phases, advancedMetrics } : data;
+}
+
+export function myHuffmanStreamFastDecodeDecompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
+  const logs: CompressionLog[] = [];
+  const phases: PhaseTiming[] = [];
+  const reader = new BitReader(buffer);
+  const output = new DynamicUint8Array();
+
+  if (collectLogs) logs.push({ timestamp: performance.now(), phase: '初始化', message: '开始极速查表 Huffman 解压' });
+
+  while (true) {
+    const isLast = reader.readBit();
+    if (isLast === null) break;
+
+    // 1. 重建 Huffman 树并生成快速查找表
+    const llRoot = deserializeTreeDeflate(reader, 9);
+    const distRoot = deserializeTreeDeflate(reader, 5);
+    if (!llRoot || !distRoot) break;
+
+    const llTable = new HuffmanDecoderTable(llRoot);
+    const distTable = new HuffmanDecoderTable(distRoot);
+
+    // 备用的慢速读符号方法 (当编码长度超过表支持的位数时)
+    const readSymbolSlow = (root: HuffmanNodeDeflate): number | null => {
+      let node = root;
+      while (node.symbol === null) {
+        const bit = reader.readBit();
+        if (bit === null) return null;
+        node = bit === 0 ? node.left! : node.right!;
+      }
+      return node.symbol;
+    };
+
+    const readSymbolFast = (table: HuffmanDecoderTable): number | null => {
+      // 尝试偷看 MAX_LOOKUP_BITS 位
+      const peeked = reader.peekBits(table.MAX_LOOKUP_BITS);
+      
+      if (peeked !== null) {
+        const entry = table.lookupTable[peeked];
+        if (entry !== -1) {
+          const bitLen = entry & 0xFFFF;
+          const symbol = entry >>> 16;
+          reader.skipBits(bitLen);
+          return symbol;
+        }
+      }
+      
+      // 表里没有命中（可能是超过了 MAX_LOOKUP_BITS 深度，或者是文件末尾不够偷看），退回到慢速逐位读取
+      return readSymbolSlow(table.root);
+    };
+
+    // 2. 解码当前块
+    while (true) {
+      const symbol = readSymbolFast(llTable);
+      if (symbol === null || symbol === 256) break;
+
+      if (symbol < 256) {
+        output.push(symbol);
+      } else {
+        const lenBase = getLengthBase(symbol);
+        let length = lenBase.base;
+        if (lenBase.extraBits > 0) {
+          const extra = reader.readBits(lenBase.extraBits);
+          if (extra === null) break;
+          length += extra;
+        }
+
+        const distSymbol = readSymbolFast(distTable);
+        if (distSymbol === null) break;
+        const distBase = getDistanceBase(distSymbol);
+        let distance = distBase.base;
+        if (distBase.extraBits > 0) {
+          const extra = reader.readBits(distBase.extraBits);
+          if (extra === null) break;
+          distance += extra;
+        }
+
+        // 这里使用的是我们自己封装的 DynamicUint8Array 内部实现了 block copy 或者循环 push
+        output.copy(output.length - distance, length);
+      }
+    }
+
+    if (isLast === 1) break;
+  }
+
+  const data = output.getArray();
+  return collectLogs ? { data, logs, phases } : data;
+}
+
+export function myHuffmanStreamOptimizedDecompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
+  // 解压逻辑我们直接走最新写的 FastDecode 逻辑以享受查表加速
+  return myHuffmanStreamFastDecodeDecompress(buffer, collectLogs);
+}
+
+export function myHuffmanStreamFastDecodeCompress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
+  // 压缩我们复用 Optimized 的高效哈希压缩逻辑
+  return myHuffmanStreamOptimizedCompress(buffer, collectLogs);
+}
+
 export function myHuffman2Compress(buffer: Uint8Array, collectLogs: boolean = false): Uint8Array | DetailedCompressionResult {
   const logs: CompressionLog[] = [];
   const phases: PhaseTiming[] = [];

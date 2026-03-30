@@ -2,10 +2,11 @@ import { Token, MIN_MATCH_LENGTH } from './types';
 import { BitWriter } from './io';
 import {
   getLengthInfo, getDistanceInfo,
-  buildHuffmanTreeDeflate, serializeTreeDeflate,
-  HuffmanNodeDynamic, writeHuffmanTreeDynamic
+  buildHuffmanTreeDeflate,
+  HuffmanNodeDynamic, writeHuffmanTreeDynamic,
+  serializeTreeDeflate
 } from './huffman-utils';
-import { CompressionLog, PhaseTiming } from '../../../../types';
+import { CompressionLog, PhaseTiming } from '@/types';
 import { trackPhase } from './utils';
 
 /**
@@ -273,8 +274,8 @@ export function encodeHuffmanDeflate(tokens: Token[], logs?: CompressionLog[], p
   }
 
   const treeHeaderSize = trackPhase('写入树结构', () => {
-    const llTreeHeaderSize = serializeTreeDeflate(llTree.root, writer, 9); // Max LL symbol 285 (9 bits)
-    const distTreeHeaderSize = serializeTreeDeflate(distTree.root, writer, 5); // Max Dist symbol 29 (5 bits)
+    const llTreeHeaderSize = serializeTreeDeflate(llTree.root, writer, 9); // 286个符号，用9位
+    const distTreeHeaderSize = serializeTreeDeflate(distTree.root, writer, 5); // 30个符号，用5位
     return llTreeHeaderSize + distTreeHeaderSize;
   }, phases);
 

@@ -1,5 +1,5 @@
 import { Token, WINDOW_SIZE, MAX_MATCH_LENGTH, MIN_MATCH_LENGTH } from './types';
-import { CompressionLog } from '../../../../types';
+import { AdvancedMetrics, CompressionLog } from '@/types';
 
 // ==========================================
 // 哈希表参数，用于快速字符串匹配
@@ -20,7 +20,7 @@ const HASH_MASK_2 = HASH_SIZE_2 - 1;
 /**
  * 基础版：暴力匹配 LZ77
  */
-export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: import('../../../../types').AdvancedMetrics): Token[] {
+export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: AdvancedMetrics): Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
   
@@ -155,7 +155,7 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[], 
 /**
  * 优化版1：哈希链表匹配 LZ77
  */
-export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: import('../../../../types').AdvancedMetrics): Token[] {
+export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: AdvancedMetrics): Token[] {
   const tokens: Token[] = [];
   const len = buffer.length;
   let cursor = 0;
@@ -315,7 +315,7 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
 /**
  * 优化版2：环形数组哈希链表匹配 LZ77
  */
-export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: import('../../../../types').AdvancedMetrics): Token[] {
+export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: CompressionLog[], advancedMetrics?: AdvancedMetrics): Token[] {
   const tokens: Token[] = [];
   let cursor = 0;
 
