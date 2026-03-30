@@ -7,6 +7,7 @@ import AlgorithmTable from './AlgorithmTable';
 import PerformanceChart, { ChartData } from './PerformanceChart';
 import { zhCN } from '@/locales/zh-CN';
 import { useAppContext } from '@/contexts/AppContext';
+import { computeScores } from '@/utils/computeScores';
 
 const { Title } = Typography;
 
@@ -64,10 +65,47 @@ const ResultBoard: React.FC = () => {
       });
   }, [allStats, algorithms, completedCount]);
 
+  // 计算得分
+  const scoredStats = useMemo(() => {
+    if (completedCount === 0) return {};
+
+    // 准备算法数据
+    const algorithmData = algorithms
+      .filter(algo => allStats[algo] && !allStats[algo].error)
+      .map(algo => {
+        const stat = allStats[algo];
+        const sizeMB = stat.originalSize / (1024 * 1024);
+        const compressSpeed = stat.avgCompressTime > 0 ? sizeMB / (stat.avgCompressTime / 1000) : 0;
+        const decompressSpeed = stat.avgDecompressTime > 0 ? sizeMB / (stat.avgDecompressTime / 1000) : 0;
+
+        return {
+          name: algo,
+          compressSpeed,
+          decompressSpeed,
+          ratio: parseFloat(stat.ratio)
+        };
+      });
+
+    // 计算得分
+    const weights = { ratio: 0.8, compress: 0.05, decompress: 0.15 };
+    const fileSizeMB = payload?.data ? payload.data.length / (1024 * 1024) : 1;
+    const scores = computeScores(algorithmData, weights, fileSizeMB);
+
+    // 将得分添加到 stats 对象中
+    const scored = { ...allStats };
+    scores.forEach(score => {
+      if (scored[score.name]) {
+        scored[score.name] = { ...scored[score.name], score };
+      }
+    });
+
+    return scored;
+  }, [allStats, algorithms, completedCount, payload]);
+
   // 表格数据
   const tableData = algorithms
     .sort((a, b) => a.localeCompare(b))
-    .map((algo) => allStats[algo])
+    .map((algo) => scoredStats[algo])
     .filter((stats): stats is Stats => stats !== undefined);
 
   if (!payload || algorithms.length === 0) return null;

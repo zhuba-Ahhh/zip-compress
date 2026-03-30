@@ -1,8 +1,10 @@
 import React from 'react';
-import { Table } from 'antd';
+import { Table, Card, Collapse } from 'antd';
 import { Stats } from '@/types';
 import { zhCN } from '@/locales/zh-CN';
 import { formatSize } from '@/utils';
+
+const { Panel } = Collapse;
 
 interface AlgorithmTableProps {
   data: Stats[];
@@ -133,6 +135,47 @@ const AlgorithmTable: React.FC<AlgorithmTableProps> = ({ data }) => {
       ),
       sorter: (a: Stats, b: Stats) => (a.isMatch ? 1 : 0) - (b.isMatch ? 1 : 0),
       width: 120,
+    },
+    {
+      title: '总分',
+      dataIndex: 'score',
+      key: 'score',
+      render: (score: any) => {
+        if (!score) return '-';
+        let isBest = false;
+        let color = '#1890ff';
+        if (data.length > 0) {
+          const allScores = data.map(item => item.score?.total || 0);
+          const maxScore = Math.max(...allScores);
+          isBest = score.total === maxScore;
+        }
+        if (score.total > 8) color = '#52c41a';
+        else if (score.total < 5) color = '#ff4d4f';
+
+        return (
+          <Collapse>
+            <Panel
+              header={
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <span style={{ color, fontWeight: 'bold' }}>{score.total.toFixed(2)}</span>
+                  {isBest && <span style={{ color: '#52c41a' }}>⭐</span>}
+                </div>
+              }
+              key="1"
+            >
+              <Card size="small">
+                <div style={{ fontSize: 12 }}>
+                  <div style={{ marginBottom: 4 }}>压缩率: <strong>{score.ratioScore.toFixed(2)}</strong></div>
+                  <div style={{ marginBottom: 4 }}>压缩速度: <strong>{score.compressScore.toFixed(2)}</strong></div>
+                  <div>解压速度: <strong>{score.decompressScore.toFixed(2)}</strong></div>
+                </div>
+              </Card>
+            </Panel>
+          </Collapse>
+        );
+      },
+      sorter: (a: Stats, b: Stats) => (a.score?.total || 0) - (b.score?.total || 0),
+      width: 200,
     },
   ];
 

@@ -32,6 +32,14 @@ export interface PhaseTiming {
   duration: number; // 耗时(ms)
 }
 
+export interface ScoreResult {
+  name: string;
+  ratioScore: number;
+  compressScore: number;
+  decompressScore: number;
+  total: number;
+}
+
 export interface Stats {
   algorithm: string;
   originalSize: number;
@@ -56,4 +64,5 @@ export interface Stats {
   loading?: boolean;
   logs?: CompressionLog[];
   advancedMetrics?: AdvancedMetrics;
+  score?: ScoreResult; // 算法得分
 }

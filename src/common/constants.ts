@@ -10,6 +10,6 @@ export const DEFAULT_VALUES = {
   RANDOM_LENGTH: 300000,
   RANDOMNESS: 0.6,
   EXECUTION_COUNT: 1,
-  ALGORITHMS: ['pako', 'lz-string'],
+  ALGORITHMS: ["fflate","lz4js","pako","snappyjs"],
   SHOW_ADVANCED_METRICS: true,
 };

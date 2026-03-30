@@ -104,40 +104,58 @@ const StatsDescriptions = memo(({ stats, algorithmDescription }: { stats: Stats,
 
   return (
     <Descriptions column={2} size="small" style={{ minHeight: 140 }}>
-      <Descriptions.Item label={zhCN.algorithm} span={2}>
-        <Text strong ellipsis={{ tooltip: algorithmDescription }}>{algorithmDescription}</Text>
-      </Descriptions.Item>
-      <Descriptions.Item label={zhCN.originalSize}>
-        <Text strong>{formatSize(stats.originalSize)}</Text> <Text type="secondary" style={{ fontSize: 11 }}>({stats.originalSize} B)</Text>
-      </Descriptions.Item>
-      <Descriptions.Item label={zhCN.compressedSize}>
-        <Text strong type="success">{formatSize(stats.compressedSize)}</Text> <Text type="secondary" style={{ fontSize: 11 }}>({stats.compressedSize} B)</Text>
-      </Descriptions.Item>
-      <Descriptions.Item label={zhCN.compressionRatio}>
-        <Tag color="blue">{stats.ratio || '-'}</Tag>
-      </Descriptions.Item>
-      <Descriptions.Item label={zhCN.dataConsistency}>
-        {!stats.loading && stats.ratio !== '' && (
-          stats.isMatch ? <Tag color="success">{zhCN.verificationPassed}</Tag> : <Tag color="error">{zhCN.dataCorrupted}</Tag>
+        <Descriptions.Item label={zhCN.algorithm} span={2}>
+          <Text strong ellipsis={{ tooltip: algorithmDescription }}>{algorithmDescription}</Text>
+        </Descriptions.Item>
+        <Descriptions.Item label={zhCN.originalSize}>
+          <Text strong>{formatSize(stats.originalSize)}</Text> <Text type="secondary" style={{ fontSize: 11 }}>({stats.originalSize} B)</Text>
+        </Descriptions.Item>
+        <Descriptions.Item label={zhCN.compressedSize}>
+          <Text strong type="success">{formatSize(stats.compressedSize)}</Text> <Text type="secondary" style={{ fontSize: 11 }}>({stats.compressedSize} B)</Text>
+        </Descriptions.Item>
+        <Descriptions.Item label={zhCN.compressionRatio}>
+          <Tag color="blue">{stats.ratio || '-'}</Tag>
+        </Descriptions.Item>
+        <Descriptions.Item label={zhCN.dataConsistency}>
+          {!stats.loading && stats.ratio !== '' && (
+            stats.isMatch ? <Tag color="success">{zhCN.verificationPassed}</Tag> : <Tag color="error">{zhCN.dataCorrupted}</Tag>
+          )}
+        </Descriptions.Item>
+        <Descriptions.Item label={zhCN.avgCompressTime}>
+          <Text type="warning">{stats.avgCompressTime.toFixed(2)} ms</Text>
+        </Descriptions.Item>
+        <Descriptions.Item label={zhCN.avgDecompressTime}>
+          <Text type="warning">{stats.avgDecompressTime.toFixed(2)} ms</Text>
+        </Descriptions.Item>
+        {stats.score && (
+          <>
+            <Descriptions.Item label="总分" span={2}>
+              <Tag color={stats.score.total > 8 ? "success" : stats.score.total < 5 ? "error" : "blue"} style={{ fontSize: 14, padding: '0 8px' }}>
+                {stats.score.total.toFixed(2)}
+              </Tag>
+            </Descriptions.Item>
+            <Descriptions.Item label="压缩率得分">
+              <Text>{stats.score.ratioScore.toFixed(2)}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="压缩速度得分">
+              <Text>{stats.score.compressScore.toFixed(2)}</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label="解压速度得分">
+              <Text>{stats.score.decompressScore.toFixed(2)}</Text>
+            </Descriptions.Item>
+          </>
         )}
-      </Descriptions.Item>
-      <Descriptions.Item label={zhCN.avgCompressTime}>
-        <Text type="warning">{stats.avgCompressTime.toFixed(2)} ms</Text>
-      </Descriptions.Item>
-      <Descriptions.Item label={zhCN.avgDecompressTime}>
-        <Text type="warning">{stats.avgDecompressTime.toFixed(2)} ms</Text>
-      </Descriptions.Item>
-      {stats.executionCount > 1 && (
-        <>
-          <Descriptions.Item label={`${zhCN.total}${zhCN.compressionTime}`}>
-            <Text type="secondary">{stats.compressTime.toFixed(2)} ms</Text>
-          </Descriptions.Item>
-          <Descriptions.Item label={`${zhCN.total}${zhCN.decompressionTime}`}>
-            <Text type="secondary">{stats.decompressTime.toFixed(2)} ms</Text>
-          </Descriptions.Item>
-        </>
-      )}
-    </Descriptions>
+        {stats.executionCount > 1 && (
+          <>
+            <Descriptions.Item label={`${zhCN.total}${zhCN.compressionTime}`}>
+              <Text type="secondary">{stats.compressTime.toFixed(2)} ms</Text>
+            </Descriptions.Item>
+            <Descriptions.Item label={`${zhCN.total}${zhCN.decompressionTime}`}>
+              <Text type="secondary">{stats.decompressTime.toFixed(2)} ms</Text>
+            </Descriptions.Item>
+          </>
+        )}
+      </Descriptions>
   );
 });
 
