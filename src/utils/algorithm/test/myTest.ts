@@ -64,11 +64,6 @@ export function lz77Compress(data: Uint8Array): Token[] {
   return tokens;
 }
 
-export function huffmanCompress(_tokens: Token[]): Uint8Array {
-  // 实现 Huffman 编码
-  return new Uint8Array();
-}
-
 /**
  * 位写入器
  * 用于将压缩后的数据写入到 Uint8Array 中

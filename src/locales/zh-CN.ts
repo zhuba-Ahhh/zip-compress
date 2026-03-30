@@ -8,7 +8,7 @@ export const zhCN = {
   dataConsistency: '数据一致性',
   verificationPassed: '校验通过',
   dataCorrupted: '数据损坏',
-  viewLogs: '查看日志',
+  viewLogs: '日志',
   downloadCompressed: '压缩文件',
   downloadDecompressed: '解压文件',
   processing: '正在处理中...',
@@ -63,6 +63,8 @@ export const zhCN = {
   testResultsComparison: '测试结果对比',
   loopTimes: '循环',
   times: '次',
+  cardView: '卡片视图',
+  tableView: '表格视图',
 
 
   // PerformanceChart keys

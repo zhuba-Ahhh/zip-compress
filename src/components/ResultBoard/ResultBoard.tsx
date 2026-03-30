@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Row, Col, Typography } from 'antd';
+import { Row, Col, Typography, Button, Space } from 'antd';
+import { BorderOutlined, TableOutlined } from '@ant-design/icons';
 import { Stats } from '@/types';
 import AlgorithmCard from './AlgorithmCard';
+import AlgorithmTable from './AlgorithmTable';
 import PerformanceChart, { ChartData } from './PerformanceChart';
 import { zhCN } from '@/locales/zh-CN';
 import { useAppContext } from '@/contexts/AppContext';
@@ -17,6 +19,7 @@ const ResultBoard: React.FC = () => {
 
   const [allStats, setAllStats] = useState<Record<string, Stats>>({});
   const [completedCount, setCompletedCount] = useState(0);
+  const [viewMode, setViewMode] = useState<'card' | 'table'>('card');
 
   useEffect(() => {
     if (payload) {
@@ -61,13 +64,37 @@ const ResultBoard: React.FC = () => {
       });
   }, [allStats, algorithms, completedCount]);
 
+  // 表格数据
+  const tableData = algorithms
+    .sort((a, b) => a.localeCompare(b))
+    .map((algo) => allStats[algo])
+    .filter((stats): stats is Stats => stats !== undefined);
+
   if (!payload || algorithms.length === 0) return null;
 
   return (
     <div style={{ marginTop: 24 }}>
-      <Title level={4}>{zhCN.testResultsComparison} ({zhCN.loopTimes} {payload.executionCount} {zhCN.times})</Title>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <Title level={4} style={{ margin: 0 }}>{zhCN.testResultsComparison} ({zhCN.loopTimes} {payload.executionCount} {zhCN.times})</Title>
+        <Space>
+          <Button
+            type={viewMode === 'card' ? 'primary' : 'default'}
+            icon={<BorderOutlined />}
+            onClick={() => setViewMode('card')}
+          >
+            {zhCN.cardView}
+          </Button>
+          <Button
+            type={viewMode === 'table' ? 'primary' : 'default'}
+            icon={<TableOutlined />}
+            onClick={() => setViewMode('table')}
+          >
+            {zhCN.tableView}
+          </Button>
+        </Space>
+      </div>
 
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24, display: viewMode === 'card' ? 'flex' : 'none' }}>
         {algorithms.sort((a, b) => a.localeCompare(b)).map((algo) => (
           <Col xs={24} md={algorithms.length > 1 ? 12 : 24} key={`${algo}-${payload.triggerId}`}>
             <AlgorithmCard
@@ -77,6 +104,10 @@ const ResultBoard: React.FC = () => {
           </Col>
         ))}
       </Row>
+
+      <div style={{ marginBottom: 24, display: viewMode === 'table' ? 'block' : 'none' }}>
+        <AlgorithmTable data={tableData} />
+      </div>
 
       {/* Summary Chart */}
       {completedCount === algorithms.length && chartData.length > 0 && (
