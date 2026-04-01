@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "cd:build": "pnpm build && pm2 start \"serve -s dist -l 9001\" --name zip-compress"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
