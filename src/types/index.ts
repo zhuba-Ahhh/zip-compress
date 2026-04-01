@@ -13,7 +13,7 @@ export interface ChunkMetric {
   offset: number;     // Starting offset in original file
   originalSize: number; // Block size in bytes
   compressedSize: number; // Compressed size in bytes (can be fractional if bits)
-  ratio: number;      // compressed / original
+  ratio: number;      // (original - compressed) / original
 }
 
 export interface TimeMetric {

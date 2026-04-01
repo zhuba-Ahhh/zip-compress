@@ -13,7 +13,7 @@ interface AlgorithmData {
   name: string;
   compressSpeed: number;   // MB/s
   decompressSpeed: number; // MB/s
-  ratio: number;           // 压缩比 (压缩后/原始大小), 越小越好 (百分比)
+  ratio: number;           // 压缩比 ((原始大小 - 压缩后大小) / 原始大小), 越大越好 (百分比)
   isWasm?: boolean;
 }
 
@@ -53,14 +53,14 @@ function computeScores(
   }));
 
   // 2. 组内归一化
-  const minRatio = Math.min(...effective.map((a) => a.ratio));
+  const maxRatio = Math.max(...effective.map((a) => a.ratio));
   const maxCompress = Math.max(...effective.map((a) => a.effCompress));
   const maxDecompress = Math.max(...effective.map((a) => a.effDecompress));
 
   // 3. 计算总分
   return effective
     .map((a) => {
-      const ratioScore = (minRatio / a.ratio) * 10;
+      const ratioScore = maxRatio > 0 ? (a.ratio / maxRatio) * 10 : 0;
       const compressScore = (a.effCompress / maxCompress) * 10;
       const decompressScore = (a.effDecompress / maxDecompress) * 10;
       const total =

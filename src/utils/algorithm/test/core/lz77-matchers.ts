@@ -118,7 +118,7 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[], 
         offset: currentChunkStart,
         originalSize: cursor - currentChunkStart,
         compressedSize: currentChunkCompressedBits / 8,
-        ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+        ratio: 1 - (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
       });
       currentChunkStart = cursor;
       currentChunkCompressedBits = 0;
@@ -130,7 +130,7 @@ export function lz77CompressSimple(buffer: Uint8Array, logs?: CompressionLog[], 
       offset: currentChunkStart,
       originalSize: cursor - currentChunkStart,
       compressedSize: currentChunkCompressedBits / 8,
-      ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+      ratio: 1 - (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
     });
   }
 
@@ -277,7 +277,7 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
         offset: currentChunkStart,
         originalSize: cursor - currentChunkStart,
         compressedSize: currentChunkCompressedBits / 8,
-        ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+        ratio: 1 - (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
       });
       currentChunkStart = cursor;
       currentChunkCompressedBits = 0;
@@ -290,7 +290,7 @@ export function lz77CompressHashChain(buffer: Uint8Array, logs?: CompressionLog[
       offset: currentChunkStart,
       originalSize: cursor - currentChunkStart,
       compressedSize: currentChunkCompressedBits / 8,
-      ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+      ratio: 1 - (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
     });
   }
 
@@ -441,7 +441,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
         offset: currentChunkStart,
         originalSize: cursor - currentChunkStart,
         compressedSize: currentChunkCompressedBits / 8,
-        ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+        ratio: 1 - (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
       });
       currentChunkStart = cursor;
       currentChunkCompressedBits = 0;
@@ -454,7 +454,7 @@ export function lz77CompressHashChainOptimized(buffer: Uint8Array, logs?: Compre
       offset: currentChunkStart,
       originalSize: cursor - currentChunkStart,
       compressedSize: currentChunkCompressedBits / 8,
-      ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+      ratio: 1 - (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
     });
   }
 

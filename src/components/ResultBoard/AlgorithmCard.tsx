@@ -213,7 +213,7 @@ const AlgorithmCard: React.FC<AlgorithmCardProps> = ({ algorithm, onComplete }) 
             avgCompressTime: result.totalCompressTime / payload.executionCount,
             avgDecompressTime: result.totalDecompressTime / payload.executionCount,
             decompressedSize: result.finalDecompressedData.length,
-            ratio: ((result.finalCompressedData.length / payload.data.length) * 100).toFixed(2) + '%',
+            ratio: (((payload.data.length - result.finalCompressedData.length) / payload.data.length) * 100).toFixed(2) + '%',
             isMatch: result.finalIsMatch,
             executionCount: payload.executionCount,
             compressedData: result.finalCompressedData,

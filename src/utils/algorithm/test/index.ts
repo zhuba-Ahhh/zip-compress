@@ -249,7 +249,7 @@ export function myHuffmanStreamCompress(buffer: Uint8Array, collectLogs: boolean
       details: {
         originalSize: buffer.length,
         compressedSize: data.length,
-        ratio: `${((data.length / buffer.length) * 100).toFixed(2)}%`
+        ratio: `${(((buffer.length - data.length) / buffer.length) * 100).toFixed(2)}%`
       }
     });
   }
@@ -448,7 +448,7 @@ export function myHuffmanStreamOptimizedCompress(buffer: Uint8Array, collectLogs
       details: {
         originalSize: buffer.length,
         compressedSize: data.length,
-        ratio: `${((data.length / buffer.length) * 100).toFixed(2)}%`
+        ratio: `${(((buffer.length - data.length) / buffer.length) * 100).toFixed(2)}%`
       }
     });
   }

@@ -55,7 +55,7 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
 
     // Construct radar chart dimensions
     const dimensions = [
-      { name: zhCN.compressionRatioLowerIsBetter, key: 'ratioScore' },
+      { name: zhCN.compressionRatioHigherIsBetter, key: 'ratioScore' },
       { name: zhCN.compressionSpeedHigherIsBetter, key: 'cSpeedScore' },
       { name: zhCN.decompressionSpeedHigherIsBetter, key: 'dSpeedScore' },
     ];
@@ -64,9 +64,8 @@ const PerformanceChart: React.FC<PerformanceChartProps> = ({ data }) => {
       const row: any = { subject: dim.name };
       data.forEach(d => {
         if (dim.key === 'ratioScore') {
-          // Smaller compression ratio is better, reverse scoring
-          const minRatio = Math.min(...data.map(d => d.ratio));
-          row[d.name] = d.ratio === 0 ? 100 : Math.max(0, 100 - ((d.ratio - minRatio) / (maxRatio - minRatio || 1)) * 100);
+          // Larger compression ratio is better
+          row[d.name] = maxRatio === 0 ? 0 : (d.ratio / maxRatio) * 100;
         } else if (dim.key === 'cSpeedScore') {
           row[d.name] = maxCSpeed === 0 ? 0 : (d.compressSpeed / maxCSpeed) * 100;
         } else if (dim.key === 'dSpeedScore') {

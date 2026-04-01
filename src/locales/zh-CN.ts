@@ -69,6 +69,7 @@ export const zhCN = {
 
   // PerformanceChart keys
   compressionRatioLowerIsBetter: '压缩率(越小越好)',
+  compressionRatioHigherIsBetter: '压缩率(越大越好)',
   compressionSpeedHigherIsBetter: '压缩速度(越快越好)',
   decompressionSpeedHigherIsBetter: '解压速度(越快越好)',
   
@@ -99,7 +100,7 @@ export const zhCN = {
   decompressLifecycleDesc: '展示解压算法内部各个步骤的具体耗时分布',
   
   compressionRatioComparison: '📉 压缩比率对比 (%)',
-  shorterIsBetter: '柱子越短越好',
+  shorterIsBetter: '柱子越长越好',
   compressionRatioPercent: '压缩比率(%)',
   
   throughputComparison: '⚡️ 吞吐量对比 (MB/s)',

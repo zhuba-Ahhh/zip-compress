@@ -200,7 +200,7 @@ export function myZipCompress(buffer: Uint8Array, collectLogs: boolean = false):
           offset: currentChunkStart,
           originalSize: cursor - currentChunkStart,
           compressedSize: currentChunkCompressedBits / 8,
-          ratio: (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
+          ratio: 1 - (currentChunkCompressedBits / 8) / (cursor - currentChunkStart)
         });
         currentChunkStart = cursor;
         currentChunkCompressedBits = 0;

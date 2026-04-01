@@ -73,7 +73,7 @@ const AlgorithmTable: React.FC<AlgorithmTableProps> = ({ data }) => {
           </div>
         );
       },
-      sorter: (a: Stats, b: Stats) => parseFloat(a.ratio) - parseFloat(b.ratio),
+      sorter: (a: Stats, b: Stats) => parseFloat(b.ratio) - parseFloat(a.ratio),
       width: 120,
     },
     {
